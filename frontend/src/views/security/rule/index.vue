@@ -26,7 +26,15 @@
             </div>
           </div>
           <div class="table-container">
-            <Table border stripe :columns="queryRuleColumns" :data="QUERY.showRuleList" :scroll="queryTableScroll" size="small" :loading="QUERY.loading">
+            <Table
+              border
+              stripe
+              :columns="queryRuleColumns"
+              :data="QUERY.showRuleList"
+              :scroll="queryTableScroll"
+              size="small"
+              :loading="QUERY.loading"
+            >
               <template #targetType="{ row }">
                 {{ getTargetType(row.targetType).i18n }}
               </template>
@@ -80,7 +88,15 @@
             </div>
           </div>
           <div class="table-container">
-            <Table border stripe :columns="sensitiveRuleColumns" :data="SENSITIVE.showRuleList" :scroll="sensitiveTableScroll" size="small" :loading="SENSITIVE.loading">
+            <Table
+              border
+              stripe
+              :columns="sensitiveRuleColumns"
+              :data="SENSITIVE.showRuleList"
+              :scroll="sensitiveTableScroll"
+              size="small"
+              :loading="SENSITIVE.loading"
+            >
               <template #ruleAction="{ row }">
                 <Button @click="handleViewRule(row)" type="text" size="small">
                   {{ $t('xiang-qing') }}
@@ -266,7 +282,7 @@ export default {
     handleTabClick(name) {
       this.activeTab = name;
       this.$router.push({
-        path: '/system/dmrulelist',
+        path: '/data-access/rules',
         query: {
           ruleKind: name
         }
@@ -285,7 +301,7 @@ export default {
     },
     handleViewRule(row, type = 'view') {
       this.$router.push({
-        path: `/system/dmrule/detail/${row.ruleId}`,
+        path: `/data-access/rules/detail/${row.ruleId}`,
         query: { type, ruleKind: row.ruleKind }
       });
     },
@@ -326,7 +342,7 @@ export default {
     },
     handleAddRule() {
       this.$router.push({
-        path: '/system/dmrule/create',
+        path: '/data-access/rules/create',
         query: {
           ruleKind: this.activeTab
         }
