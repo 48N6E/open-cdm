@@ -1,5 +1,5 @@
 <template>
-  <div class="sso">
+  <div class="approval">
     <div class="table-list-layout">
       <div class="table-list">
         <div class="content">
@@ -16,7 +16,7 @@
               <Button type="primary" ghost @click="handleQuery">{{ $t('cha-xun') }}</Button>
             </div>
             <div class="right">
-              <Button v-if="canEdit" @click="goCreate" type="primary" style="margin-right: 10px" icon="md-add" :disabled="!hasUnenabledProvider">
+              <Button v-if="canEdit" @click="goCreate" type="primary" style="margin-right: 10px" icon="md-add" :disabled="!hasUnaddedProvider">
                 {{ $t('xin-zeng') }}
               </Button>
               <Button @click="init" :loading="loading">
@@ -35,6 +35,17 @@
               <template #primary="{ row }">
                 <span>{{ row.primaryValue || '-' }}</span>
               </template>
+              <template #status="{ row }">
+                <div class="status-cell">
+                  <i-switch
+                    :model-value="row.enabled"
+                    true-color="#52C41A"
+                    :loading="togglingType === row.type"
+                    :disabled="!canEdit || togglingType === row.type"
+                    :before-change="() => handleToggleEnable(row)"
+                  />
+                </div>
+              </template>
               <template #action="{ row }">
                 <div class="action">
                   <a @click="goEdit(row)">{{ $t('pei-zhi') }}</a>
@@ -50,17 +61,17 @@
 
 <script>
 import { mapState } from 'vuex';
-import { SSO_PROVIDERS, ACCOUNT_AUTH_TYPE_KEY, PASSWORD_TYPE, getProviderByType, parseAuthTypes } from './constant';
+import { APPROVAL_PROVIDERS, getProviderByType, isConfigured, isEnabled } from './constant';
 
 export default {
-  name: 'SsoPage',
+  name: 'ApprovalPage',
   data() {
     return {
       loading: false,
       searchText: '',
       appliedKeyword: '',
       configList: [],
-      enabledTypes: []
+      togglingType: ''
     };
   },
   computed: {
@@ -80,27 +91,24 @@ export default {
     },
     columns() {
       return [
-        { title: this.$t('sso-col-provider'), slot: 'provider', width: 180 },
-        { title: this.$t('sso-col-primary'), slot: 'primary', minWidth: 240 },
-        { title: this.$t('sso-col-status'), key: 'statusText', width: 120 },
+        { title: this.$t('approval-col-provider'), slot: 'provider', width: 180 },
+        { title: this.$t('approval-col-primary'), slot: 'primary', minWidth: 240 },
+        { title: this.$t('approval-col-status'), slot: 'status', width: 160 },
         { title: this.$t('cao-zuo'), slot: 'action', fixed: 'right', width: 120 }
       ];
     },
     rows() {
-      return this.enabledTypes
-        .filter((t) => t !== PASSWORD_TYPE)
-        .map((t) => {
-          const def = getProviderByType(t);
-          if (!def) return null;
-          return {
-            type: def.type,
-            label: this.$t(def.labelKey),
-            iconResource: def.iconResource,
-            primaryValue: this.configMap[def.primaryField]?.currentCount || this.configMap[def.primaryField]?.configValue || '',
-            statusText: this.$t('sso-status-enabled')
-          };
-        })
-        .filter(Boolean);
+      return APPROVAL_PROVIDERS.filter((def) => isConfigured(this.configMap, def)).map((def) => {
+        const enabled = isEnabled(this.configMap, def);
+        const primaryConfig = this.configMap[def.primaryField];
+        return {
+          type: def.type,
+          label: this.$t(def.labelKey),
+          iconResource: def.iconResource,
+          primaryValue: primaryConfig?.currentCount || primaryConfig?.configValue || '',
+          enabled
+        };
+      });
     },
     filteredRows() {
       const keyword = this.appliedKeyword;
@@ -110,15 +118,8 @@ export default {
           (row.label && row.label.toLowerCase().includes(keyword)) || (row.primaryValue && String(row.primaryValue).toLowerCase().includes(keyword))
       );
     },
-    hasUnenabledProvider() {
-      return SSO_PROVIDERS.some((p) => !this.enabledTypes.includes(p.type) && !this.conflictingPeer(p.type));
-    },
-    conflictingPeer() {
-      return (type) => {
-        const def = getProviderByType(type);
-        if (!def || !def.conflictsWith) return '';
-        return def.conflictsWith.find((peer) => this.enabledTypes.includes(peer)) || '';
-      };
+    hasUnaddedProvider() {
+      return APPROVAL_PROVIDERS.some((def) => !isConfigured(this.configMap, def));
     }
   },
   mounted() {
@@ -133,9 +134,6 @@ export default {
       this.loading = false;
       if (res.success) {
         this.configList = res.data || [];
-        const authConfig = this.configList.find((c) => c.configName === ACCOUNT_AUTH_TYPE_KEY);
-        const value = authConfig?.currentCount || authConfig?.configValue || '';
-        this.enabledTypes = parseAuthTypes(value);
       }
     },
     handleQuery() {
@@ -146,17 +144,42 @@ export default {
       this.appliedKeyword = '';
     },
     goCreate() {
-      this.$router.push('/integrations/sso/create');
+      this.$router.push('/integrations/approval/create');
     },
     goEdit(row) {
-      this.$router.push(`/integrations/sso/${row.type.toLowerCase()}/edit`);
+      this.$router.push(`/integrations/approval/${row.type.toLowerCase()}/edit`);
+    },
+    handleToggleEnable(row) {
+      const def = getProviderByType(row.type);
+      if (!def) return Promise.reject();
+      const newVal = !row.enabled;
+      const hasConfig = !!this.configMap[def.enableField];
+      const updateConfigs = hasConfig ? { [def.enableField]: String(newVal) } : {};
+      const needCreateConfigs = hasConfig ? {} : { [def.enableField]: String(newVal) };
+      this.togglingType = row.type;
+      return this.$services
+        .rdpUserConfigUpsertUserConfigs({ data: { updateConfigs, needCreateConfigs } })
+        .then((res) => {
+          if (!res.success) {
+            this.$Message.error(res.msg || this.$t('cao-zuo-shi-bai'));
+            throw new Error('approval toggle failed');
+          }
+          this.$Message.success(this.$t('cao-zuo-cheng-gong'));
+          // iView Switch 在我们的 Promise resolve 之后才内部 toggle，
+          // toggle 时根据 currentValue 反转；若此刻 init 已把 :model-value
+          // 同步成新值，反转结果反而是旧值。推迟到下一个宏任务刷新。
+          setTimeout(() => this.init(), 0);
+        })
+        .finally(() => {
+          this.togglingType = '';
+        });
     }
   }
 };
 </script>
 
 <style lang="less" scoped>
-.sso {
+.approval {
   height: 100%;
 }
 
@@ -170,5 +193,11 @@ export default {
   display: inline-flex;
   align-items: center;
   gap: 12px;
+}
+
+.status-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>
