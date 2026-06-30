@@ -204,16 +204,6 @@ export default [
     redirect: '/datasource'
   },
   {
-    path: '/datasource/params/:id/:instanceId',
-    name: 'System_DataSource_Params',
-    component: () => import(/* webpackChunkName: "system-datasource" */ '@/views/dataSource/DsParams'),
-    meta: { requiredAuth: 'RDP_DS_READ' }
-  },
-  {
-    path: 'ccdatasource/params/:id/:instanceId',
-    redirect: (to) => `/datasource/params/${to.params.id}/${to.params.instanceId}`
-  },
-  {
     path: '/datasource/add',
     name: 'System_DataSource_Add',
     component: () => import(/* webpackChunkName: "system-datasource" */ '@/views/dataSource/AddDataSource'),
@@ -236,6 +226,12 @@ export default [
     path: '/data-access/cluster/list/:clusterId',
     name: 'System_Machine_List',
     component: () => import(/* webpackChunkName: "ccsystem-cluster-list" */ '@/views/system/cluster/workerList')
+  },
+  {
+    path: 'sshConfig',
+    name: 'System_Ssh_Config',
+    component: () => import(/* webpackChunkName: "system-ssh-config" */ '@/views/sshConfig/index'),
+    meta: { requiredAuth: 'DM_SSH_CHANNEL_READ' }
   },
   {
     path: 'dmmachine/list/:clusterId',

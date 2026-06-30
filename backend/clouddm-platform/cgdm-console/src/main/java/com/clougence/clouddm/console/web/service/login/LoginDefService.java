@@ -19,6 +19,7 @@ import java.util.*;
 
 import org.springframework.stereotype.Service;
 
+import com.clougence.clouddm.console.web.component.config.RootUserConfig;
 import com.clougence.clouddm.console.web.constants.LoginAuthType;
 import com.clougence.clouddm.console.web.global.i18n.DmI18nUtils;
 import com.clougence.clouddm.console.web.global.i18n.I18nRdpLabelKeys;
@@ -29,7 +30,6 @@ import com.clougence.clouddm.platform.dal.access.SystemDal;
 import com.clougence.clouddm.platform.plugin.PluginManager;
 import com.clougence.clouddm.sdk.security.login.LoginProvider;
 import com.clougence.clouddm.sdk.security.login.LoginProviderSpi;
-import com.clougence.rdp.global.config.user.UserDefinedConfig;
 import com.clougence.utils.StringUtils;
 
 import jakarta.annotation.Resource;
@@ -114,7 +114,7 @@ public class LoginDefService {
     }
 
     private String getLoginUnavailableReason(String ownerUid, LoginProvider type) {
-        String configValue = this.systemDal.fetchSystemConf(UserDefinedConfig.Fields.accountAuthType);
+        String configValue = this.systemDal.fetchSystemConf(RootUserConfig.Fields.accountAuthType);
         if (StringUtils.isBlank(configValue)) {
             return "login provider is not configured.";
         }
@@ -126,7 +126,7 @@ public class LoginDefService {
     }
 
     public List<LoginAuthType> listConfLoginTypes(String ownerUid) {
-        String configValue = this.systemDal.fetchSystemConf(UserDefinedConfig.Fields.accountAuthType);
+        String configValue = this.systemDal.fetchSystemConf(RootUserConfig.Fields.accountAuthType);
         List<LoginAuthType> loginTypes = new ArrayList<>();
         if (StringUtils.isBlank(configValue)) {
             loginTypes.add(LoginAuthType.PASSWORD);

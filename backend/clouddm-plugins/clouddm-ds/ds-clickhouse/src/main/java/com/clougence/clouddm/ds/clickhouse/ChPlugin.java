@@ -33,6 +33,7 @@ import com.clougence.clouddm.ds.clickhouse.dsconf.ChConfigSpi;
 import com.clougence.clouddm.ds.clickhouse.dsconf.ChSerializationSpi;
 import com.clougence.clouddm.ds.clickhouse.execute.ChSessionFactory;
 import com.clougence.clouddm.ds.clickhouse.execute.ChSupportSpi;
+import com.clougence.clouddm.ds.clickhouse.i18n.ChConfigI18nKeys;
 import com.clougence.clouddm.ds.clickhouse.i18n.ChDsI18nKeys;
 import com.clougence.clouddm.ds.clickhouse.language.ChLanguageSpi;
 import com.clougence.clouddm.ds.clickhouse.resource.ChEditorResourceSpi;
@@ -48,9 +49,10 @@ import com.clougence.schema.SchemaFramework;
 import com.clougence.schema.SchemaPlugin;
 
 /** @author mode 2024/12/25 15:13 */
-@Plugin(includePackages = { "com.clougence.clouddm.dsfamily.execute.*",     //
+@Plugin(name = "i18n::" + ChDsI18nKeys.PLUGIN_NAME_CLICKHOUSE,              //
+        includePackages = { "com.clougence.clouddm.dsfamily.execute.*",     //
                             "com.clougence.clouddm.ds.clickhouse.execute.*" //
-}, dsProduct = DataSourceType.ClickHouse)
+        }, dsProduct = DataSourceType.ClickHouse)
 public class ChPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
 
     @Override
@@ -89,6 +91,7 @@ public class ChPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
     private void configUi(DsPluginBinder dsPlugin) {
         //initI18n
         dsPlugin.bindPluginI18n(ChDsI18nKeys.class);
+        dsPlugin.bindPluginI18n(ChConfigI18nKeys.class);
         //sqlBuilder
         dsPlugin.bindDsSqlBuilder(ChEditorProvider.INSTANCE);
         dsPlugin.bindDsDialect(ClickHouseDialect.INSTANCE);

@@ -33,6 +33,7 @@ import com.clougence.clouddm.ds.doris.dsconf.DrConfigSpi;
 import com.clougence.clouddm.ds.doris.dsconf.DrSerializationSpi;
 import com.clougence.clouddm.ds.doris.execute.DrSessionFactory;
 import com.clougence.clouddm.ds.doris.execute.DrSupportSpi;
+import com.clougence.clouddm.ds.doris.i18n.DrConfigI18nKeys;
 import com.clougence.clouddm.ds.doris.i18n.DrDsI18nKeys;
 import com.clougence.clouddm.ds.doris.language.DrLanguageSpi;
 import com.clougence.clouddm.ds.doris.resource.DrEditorResourceSpi;
@@ -48,10 +49,11 @@ import com.clougence.schema.SchemaFramework;
 import com.clougence.schema.SchemaPlugin;
 
 /** @author mode 2024/12/25 15:13 */
-@Plugin(includePackages = { "com.clougence.clouddm.dsfamily.execute.*",      //
+@Plugin(name = "i18n::" + DrDsI18nKeys.PLUGIN_NAME_DORIS,                    //
+        includePackages = { "com.clougence.clouddm.dsfamily.execute.*",      //
                             "com.clougence.clouddm.dsfamily.mysql.execute.*",//
                             "com.clougence.clouddm.ds.doris.execute.*"       //
-}, dsProduct = DataSourceType.Doris)
+        }, dsProduct = DataSourceType.Doris)
 public class DrPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
 
     @Override
@@ -90,6 +92,7 @@ public class DrPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
     private void configUi(DsPluginBinder dsPlugin) {
         //initI18n
         dsPlugin.bindPluginI18n(DrDsI18nKeys.class);
+        dsPlugin.bindPluginI18n(DrConfigI18nKeys.class);
         //sqlBuilder
         dsPlugin.bindDsSqlBuilder(DrEditorProvider.INSTANCE);
         dsPlugin.bindDsDialect(DorisDialect.INSTANCE);

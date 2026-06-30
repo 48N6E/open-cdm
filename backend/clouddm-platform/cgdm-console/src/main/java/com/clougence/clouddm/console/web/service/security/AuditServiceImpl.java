@@ -32,12 +32,13 @@ import com.clougence.clouddm.api.console.sqlaudit.SqlExecNotifyDTO;
 import com.clougence.clouddm.api.console.sqlaudit.SqlStatus;
 import com.clougence.clouddm.api.console.sqlaudit.Type;
 import com.clougence.clouddm.base.metadata.ds.DataSourceConfig;
+import com.clougence.clouddm.console.web.component.config.RootUserConfig;
 import com.clougence.clouddm.console.web.component.dsconfig.DmDsConfigService;
 import com.clougence.clouddm.console.web.component.dsconfig.mode.DsConfig;
-import com.clougence.clouddm.console.web.global.config.DmConsoleConfig;
 import com.clougence.clouddm.console.web.global.notify.DmWorkerRegisterNotify;
 import com.clougence.clouddm.console.web.service.analysis.QueryAnalysisService;
 import com.clougence.clouddm.console.web.service.auth.RdpUserService;
+import com.clougence.clouddm.console.web.util.RdpHostUtil;
 import com.clougence.clouddm.platform.dal.access.DataSourceDal;
 import com.clougence.clouddm.platform.dal.access.ExecutionDal;
 import com.clougence.clouddm.platform.dal.access.SystemDal;
@@ -51,7 +52,6 @@ import com.clougence.clouddm.sdk.model.analysis.resource.ResObject;
 import com.clougence.clouddm.sdk.security.auth.SecQueryKind;
 import com.clougence.clouddm.sdk.service.secrules.Requester;
 import com.clougence.clouddm.sdk.service.secrules.RuleDomain;
-import com.clougence.rdp.global.config.user.UserDefinedConfig;
 import com.clougence.schema.umi.struts.UmiTypes;
 import com.clougence.utils.StringUtils;
 import com.clougence.utils.ThreadUtils;
@@ -81,8 +81,6 @@ public class AuditServiceImpl implements AuditService, DmWorkerRegisterNotify, U
     private RdpUserService              rdpUserService;
     @Resource
     private DmDsConfigService           dmDsConfigService;
-    @Resource
-    private DmConsoleConfig             rdpConsoleConfig;
 
     @Override
     @Transactional(rollbackFor = Throwable.class)
@@ -140,7 +138,7 @@ public class AuditServiceImpl implements AuditService, DmWorkerRegisterNotify, U
                     }
                 }
                 try {
-                    DataSourceConfig dataSourceConfig = dmDsConfigService.fetchDsConfigFromDM(rdpDataSourceDO.getId(), rdpDataSourceDO.getDataSourceType());
+                    DataSourceConfig dataSourceConfig = dmDsConfigService.fetchDsConfigFromExists(rdpDataSourceDO.getId());
                     Map<RuleDomain, List<ResObject>> objs = queryAnalysisService.analysisResourceV2(dataSourceConfig, dto.getSql(), map);
 
                     List<String> collect = objs.values().stream().flatMap(List::stream).map(obj -> {
@@ -153,7 +151,7 @@ public class AuditServiceImpl implements AuditService, DmWorkerRegisterNotify, U
                     auditDO.setResource("");
                 }
 
-                auditDO.setLogIp(rdpConsoleConfig.getConsolePackageMode().getLocalIpOrHostName());
+                auditDO.setLogIp(RdpHostUtil.getHostIp());
                 auditDO.setWorkSeqNumber(wsn);
                 auditDO.setClientIp(dto.getClientIp());
                 auditDO.setDsId(dto.getDsId());
@@ -216,7 +214,7 @@ public class AuditServiceImpl implements AuditService, DmWorkerRegisterNotify, U
     private void deleteTimeoutLog() {
         for (DmAuthUserDO rdpUserDO : rdpUserService.listPrimaryUser()) {
             Date now = new Date();
-            DmSysUserConfDO configDO = systemDal.userConfMapper().queryByUidAndConfigName(rdpUserDO.getUid(), UserDefinedConfig.Fields.sqlAuditRetentionDays);
+            DmSysUserConfDO configDO = systemDal.userConfMapper().queryByUidAndConfigName(rdpUserDO.getUid(), RootUserConfig.Fields.sqlAuditRetentionDays);
             int day = 30;
             String configValue = configDO.getConfigValue();
             if (StringUtils.isNotEmpty(configValue) && StringUtils.isNumeric(configValue)) {

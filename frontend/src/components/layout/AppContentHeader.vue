@@ -33,7 +33,7 @@ export default {
   emits: ['check-version'],
   computed: {
     ...mapGetters(['includesDM', 'isDesktop']),
-    ...mapState(['myCatLog', 'mySystemMenuItems', 'sidebarMenu']),
+    ...mapState(['dmGlobalSetting', 'myCatLog', 'mySystemMenuItems', 'sidebarMenu']),
     showSqlLink() {
       return this.includesDM && this.myCatLog.includes('CAT_DM_CONSOLE') && !this.$route.path.startsWith('/sql');
     },
@@ -208,6 +208,22 @@ export default {
       if (path === '/cicd/create') {
         return [cicdRoot, { label: this.$t('chuang-jian-xiang-mu'), to: path }];
       }
+      if (path === '/datasource/add') {
+        const dsType = this.$route.query.dsType;
+        const instanceId = this.$route.query.instanceId;
+        const isEditMode = this.$route.query.mode === 'edit';
+        const dsDisplayName = this.dataSourceDisplayName(dsType);
+        const actionLabel = isEditMode ? this.$t('bian-ji') : this.$t('xin-zeng-shu-ju-yuan');
+        const actionTo = isEditMode ? '/datasource' : dsType ? '/datasource/add' : '';
+        const breadcrumbs = [
+          { label: this.$t('nav-shu-ju-ku-guan-li'), to: '/datasource' },
+          { label: actionLabel, to: actionTo }
+        ];
+        if (dsDisplayName) {
+          breadcrumbs.push({ label: isEditMode && instanceId ? `${dsDisplayName}(${instanceId})` : dsDisplayName, to: '' });
+        }
+        return breadcrumbs;
+      }
       if (/^\/cicd\/[^/]+\/release-flow\/add$/.test(path)) {
         const flowId = this.$route.params.id;
         return [cicdRoot, flowDetail(flowId), { label: this.$t('tian-jia-git-ops'), to: path }];
@@ -296,6 +312,27 @@ export default {
         ];
       }
       return [{ label: this.pageTitle, to: path }];
+    }
+  },
+  methods: {
+    dataSourceDisplayName(dsType) {
+      if (!dsType) {
+        return '';
+      }
+      const supportNames = this.dmGlobalSetting?.dsSupportNames || [];
+      const groups = Array.isArray(supportNames) ? supportNames : [];
+      for (const group of groups) {
+        const items = Array.isArray(group) ? group : [group];
+        for (const item of items) {
+          if (typeof item === 'string' && item === dsType) {
+            return item;
+          }
+          if (item && item.dsKey === dsType) {
+            return item.displayName || item.dsKey;
+          }
+        }
+      }
+      return dsType;
     }
   }
 };

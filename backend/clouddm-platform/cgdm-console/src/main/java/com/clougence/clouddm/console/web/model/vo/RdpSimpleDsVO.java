@@ -18,13 +18,9 @@ package com.clougence.clouddm.console.web.model.vo;
 import java.util.Date;
 
 import com.clougence.clouddm.base.metadata.ds.DataSourceType;
-import com.clougence.clouddm.base.metadata.rdp.enumeration.SecurityType;
-import com.clougence.clouddm.platform.dal.model.datasource.DeployEnvInfoFetchType;
-import com.clougence.clouddm.platform.dal.model.datasource.DeployEnvType;
-import com.clougence.clouddm.platform.dal.model.datasource.HostType;
+import com.clougence.clouddm.base.metadata.ds.SecurityType;
 import com.clougence.clouddm.platform.dal.model.LifeCycleState;
 import com.clougence.clouddm.platform.dal.model.datasource.DmDsDO;
-import com.clougence.clouddm.console.web.global.i18n.DmI18nUtils;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -36,50 +32,25 @@ import lombok.Setter;
 @Setter
 public class RdpSimpleDsVO {
 
-    private Long                   id;
-
-    private Date                   gmtCreate;
-
-    private DeployEnvType          deployType;
-
-    private String                 deployTypeI18n;
-
-    private DeployEnvInfoFetchType infoFetchType;
-
-    private DataSourceType         dataSourceType;
-
-    private String                 host;
-
-    private String                 privateHost;
-
-    private String                 publicHost;
-
-    private HostType               hostType;
-
-    private String                 instanceDesc;
-
-    private String                 version;
-
-    private String                 instanceId;
-
-    private String                 accountName;
-
-    private LifeCycleState         lifeCycleState;
-
-    private SecurityType           securityType;
-
-    private Long                   dsEnvId;
-
-    private String                 dsEnvName;
+    private Long           id;
+    private Date           gmtCreate;
+    private DataSourceType dataSourceType;
+    private String         host;
+    private String         instanceDesc;
+    private String         version;
+    private String         instanceId;
+    private String         accountName;
+    private LifeCycleState lifeCycleState;
+    private SecurityType   securityType;
+    private Long           dsEnvId;
+    private String         dsEnvName;
 
     public void convertFromDO(DmDsDO dsDO) {
         this.id = dsDO.getId();
         this.gmtCreate = dsDO.getGmtCreate();
         this.host = dsDO.getHost();
-        this.privateHost = dsDO.getPrivateHost();
-        this.publicHost = dsDO.getPublicHost();
-        this.hostType = dsDO.getHostType();
-        this.accountName = dsDO.getAccount();
+        this.host = dsDO.getHost();
+        this.accountName = dsDO.getAccessKey();
         this.lifeCycleState = dsDO.getLifeCycleState();
         this.securityType = dsDO.getSecurityType();
         this.dsEnvId = dsDO.getDsEnvId();
@@ -89,13 +60,6 @@ public class RdpSimpleDsVO {
         this.instanceId = dsDO.getInstanceId();
         this.instanceDesc = dsDO.getInstanceDesc();
         this.dataSourceType = dsDO.getDataSourceType();
-        if (dsDO.getDeployType() != null) {
-            this.deployType = dsDO.getDeployType();
-            this.deployTypeI18n = DmI18nUtils.getMessage(dsDO.getDeployType().name());
-        }
-
-        this.infoFetchType = dsDO.getInfoFetchType();
-
         this.version = dsDO.getVersion();
     }
 }

@@ -85,13 +85,13 @@ module.exports = {
       '/logout': {
         target: HOST
       },
+      '/globalSettings': {
+        target: HOST
+      },
       '/signin': {
         target: HOST
       },
       '/loginMfaValid': {
-        target: HOST
-      },
-      '/globalSettings': {
         target: HOST
       },
       '/list_org': {

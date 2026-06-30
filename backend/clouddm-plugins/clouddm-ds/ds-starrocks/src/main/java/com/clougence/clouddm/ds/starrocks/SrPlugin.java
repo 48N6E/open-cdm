@@ -33,6 +33,7 @@ import com.clougence.clouddm.ds.starrocks.dsconf.SrConfigSpi;
 import com.clougence.clouddm.ds.starrocks.dsconf.SrSqlSerializationSpi;
 import com.clougence.clouddm.ds.starrocks.execute.SrSessionFactory;
 import com.clougence.clouddm.ds.starrocks.execute.SrSupportSpi;
+import com.clougence.clouddm.ds.starrocks.i18n.SrConfigI18nKeys;
 import com.clougence.clouddm.ds.starrocks.i18n.SrDsI18nKeys;
 import com.clougence.clouddm.ds.starrocks.language.SrLanguageSpi;
 import com.clougence.clouddm.ds.starrocks.resource.SrEditorResourceSpi;
@@ -48,10 +49,11 @@ import com.clougence.schema.SchemaFramework;
 import com.clougence.schema.SchemaPlugin;
 
 /** @author mode 2024/12/25 15:13 */
-@Plugin(includePackages = { "com.clougence.clouddm.dsfamily.execute.*",      //
+@Plugin(name = "i18n::" + SrDsI18nKeys.PLUGIN_NAME_STARROCKS, //
+        includePackages = { "com.clougence.clouddm.dsfamily.execute.*",      //
                             "com.clougence.clouddm.dsfamily.mysql.execute.*",//
                             "com.clougence.clouddm.ds.starrocks.execute.*"   //
-}, dsProduct = DataSourceType.StarRocks)
+        }, dsProduct = DataSourceType.StarRocks)
 public class SrPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
 
     @Override
@@ -90,6 +92,7 @@ public class SrPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
     private void configUi(DsPluginBinder dsPlugin) {
         //initI18n
         dsPlugin.bindPluginI18n(SrDsI18nKeys.class);
+        dsPlugin.bindPluginI18n(SrConfigI18nKeys.class);
         //sqlBuilder
         dsPlugin.bindDsSqlBuilder(SrEditorProvider.INSTANCE);
         dsPlugin.bindDsDialect(StarRocksDialect.INSTANCE);

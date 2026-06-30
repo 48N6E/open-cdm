@@ -16,8 +16,6 @@
 package com.clougence.rdp.service.openapi.model;
 
 import com.clougence.clouddm.base.metadata.ds.DataSourceType;
-import com.clougence.clouddm.platform.dal.model.datasource.DeployEnvType;
-import com.clougence.clouddm.platform.dal.model.datasource.HostType;
 import com.clougence.clouddm.platform.dal.model.LifeCycleState;
 
 import lombok.Data;
@@ -30,11 +28,7 @@ public class ApiListDsFO {
 
     private DataSourceType type;
 
-    private DeployEnvType  deployType;
-
     private LifeCycleState lifeCycleState;
-
-    private HostType       hostType;
 
     private Long           dataSourceId;
 

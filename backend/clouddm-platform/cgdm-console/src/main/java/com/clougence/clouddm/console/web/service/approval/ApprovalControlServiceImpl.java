@@ -86,8 +86,6 @@ import com.clougence.clouddm.sdk.security.auth.def.SecRoleAuthLabel;
 import com.clougence.clouddm.sdk.service.secrules.Requester;
 import com.clougence.clouddm.sdk.service.secrules.RuleDomain;
 import com.clougence.clouddm.sdk.service.secrules.RuleLevel;
-import com.clougence.rdp.component.resulttask.AsyncTaskWithResultService;
-import com.clougence.rdp.component.resulttask.TaskType;
 import com.clougence.rdp.service.RdpDsEnvService;
 import com.clougence.rdp.service.model.EnvTicketMO;
 import com.clougence.schema.umi.struts.UmiTypes;
@@ -251,8 +249,7 @@ public class ApprovalControlServiceImpl implements ApprovalControlService {
     public void createAuthTicket(String ownerUid, String uid, RdpAddAuthTicketFO fo) {
         DmAuthUserDO user = this.authDal.userMapper().queryByUid(uid);
         if (user != null && user.getAccountType() == AccountType.PRIMARY_ACCOUNT) {
-            throw new ErrorMessageException(
-                DmI18nUtils.getMessage(I18nRdpMsgKeys.TICKET_AUTH_TICKET_ROOT_ACCOUNT_UNSUPPORTED.name()));
+            throw new ErrorMessageException(DmI18nUtils.getMessage(I18nRdpMsgKeys.TICKET_AUTH_TICKET_ROOT_ACCOUNT_UNSUPPORTED.name()));
         }
 
         List<Long> dsIds = fo.getApplyAuths().stream().map(ApplyAuth::getResId).sorted().collect(Collectors.toList());
@@ -388,7 +385,7 @@ public class ApprovalControlServiceImpl implements ApprovalControlService {
                         break;
                 }
             });
-            DataSourceConfig dataSourceConfig = dmDsConfigService.fetchDsConfigFromDM(dsLevels.dsDO().getId(), dsLevels.dsDO().getDataSourceType());
+            DataSourceConfig dataSourceConfig = dmDsConfigService.fetchDsConfigFromExists(dsLevels.dsDO().getId());
             Map<RuleDomain, List<ResObject>> ruleDomainListMap = this.queryAnalysisService.analysisResourceV2(dataSourceConfig, fo.getRawSql(), params);
             List<ResObject> resObjects = ruleDomainListMap.values().stream().flatMap(List::stream).collect(Collectors.toList());
             String path = dsLevels.asResPath().getResPath();
@@ -648,7 +645,6 @@ public class ApprovalControlServiceImpl implements ApprovalControlService {
             DmDsDO dsDO = this.datasourceDal.dsMapper().queryDsIdentityById(approvalDO.getBindDsId());
             if (dsDO != null) {
                 vo.setDataSourceType(dsDO.getDataSourceType());
-                vo.setDsDeployType(dsDO.getDeployType());
             }
         }
         vo.setTargetInfo(approvalDO.getTargetInfo());

@@ -28,6 +28,7 @@ import com.clougence.clouddm.ds.oceanbase.dsconf.ob4ora.ObForOraSerializationSpi
 import com.clougence.clouddm.ds.oceanbase.execute.ob4ora.ObForOraSessionFactory;
 import com.clougence.clouddm.ds.oceanbase.execute.ob4ora.ObForOraSessionSpi;
 import com.clougence.clouddm.ds.oceanbase.execute.ob4ora.ObForOraSupportSpi;
+import com.clougence.clouddm.ds.oceanbase.i18n.ObConfigI18nKeys;
 import com.clougence.clouddm.ds.oceanbase.i18n.ObDsI18nKeys;
 import com.clougence.clouddm.ds.oceanbase.language.ob4ora.ObOraLanguageSpi;
 import com.clougence.clouddm.ds.oceanbase.resource.ObOraEditorResourceSpi;
@@ -46,10 +47,11 @@ import com.clougence.schema.SchemaBinder;
 import com.clougence.schema.SchemaFramework;
 import com.clougence.schema.SchemaPlugin;
 
-@Plugin(includePackages = { "com.clougence.clouddm.dsfamily.execute.*",             //
+@Plugin(name = "i18n::" + ObDsI18nKeys.PLUGIN_NAME_OB_FOR_ORACLE, //
+        includePackages = { "com.clougence.clouddm.dsfamily.execute.*",             //
                             "com.clougence.clouddm.ds.oracle.execute.*",            //
                             "com.clougence.clouddm.ds.oceanbase.execute.obforora.*" //
-}, dsProduct = DataSourceType.ObForOracle)
+        }, dsProduct = DataSourceType.ObForOracle)
 public class ObOraDsPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
 
     @Override
@@ -88,6 +90,7 @@ public class ObOraDsPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
     private void configUi(DsPluginBinder dsPlugin) {
         //initI18n
         dsPlugin.bindPluginI18n(ObDsI18nKeys.class);
+        dsPlugin.bindPluginI18n(ObConfigI18nKeys.class);
         //sqlBuilder
         dsPlugin.bindDsSqlBuilder(OraEditorProvider.INSTANCE);
         dsPlugin.bindDsDialect(OracleDialect.INSTANCE);

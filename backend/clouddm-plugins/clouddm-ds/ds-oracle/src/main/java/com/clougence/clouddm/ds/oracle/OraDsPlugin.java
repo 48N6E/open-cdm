@@ -34,6 +34,7 @@ import com.clougence.clouddm.ds.oracle.execute.OraSessionFactory;
 import com.clougence.clouddm.ds.oracle.execute.OraSessionSpi;
 import com.clougence.clouddm.ds.oracle.execute.OraSupportSpi;
 import com.clougence.clouddm.ds.oracle.i18n.Ora18nKeys;
+import com.clougence.clouddm.ds.oracle.i18n.OraConfigI18nKeys;
 import com.clougence.clouddm.ds.oracle.language.OraLanguageSpi;
 import com.clougence.clouddm.ds.oracle.resource.OraEditorResourceSpi;
 import com.clougence.clouddm.dsfamily.definition.TypeMapUtils;
@@ -47,9 +48,10 @@ import com.clougence.schema.SchemaFramework;
 import com.clougence.schema.SchemaPlugin;
 
 /** @author mode 2024/12/25 15:13 */
-@Plugin(includePackages = { "com.clougence.clouddm.dsfamily.execute.*", //
+@Plugin(name = "i18n::" + Ora18nKeys.PLUGIN_NAME_ORACLE, //
+        includePackages = { "com.clougence.clouddm.dsfamily.execute.*", //
                             "com.clougence.clouddm.ds.oracle.execute.*" //
-}, dsProduct = DataSourceType.Oracle)
+        }, dsProduct = DataSourceType.Oracle)
 public class OraDsPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
 
     @Override
@@ -87,6 +89,7 @@ public class OraDsPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
     private void configUi(DsPluginBinder dsPlugin) {
         //initI18n
         dsPlugin.bindPluginI18n(Ora18nKeys.class);
+        dsPlugin.bindPluginI18n(OraConfigI18nKeys.class);
         //sqlBuilder
         dsPlugin.bindDsSqlBuilder(OraEditorProvider.INSTANCE);
         dsPlugin.bindDsDialect(OracleDialect.INSTANCE);

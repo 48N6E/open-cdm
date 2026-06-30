@@ -30,6 +30,7 @@ import com.clougence.clouddm.ds.ads.dsconf.ads4my.AdsMyConfigSpi;
 import com.clougence.clouddm.ds.ads.dsconf.ads4my.AdsMySerializationSpi;
 import com.clougence.clouddm.ds.ads.execute.ads4my.AdsMySessionFactory;
 import com.clougence.clouddm.ds.ads.execute.ads4my.AdsSupportSpi;
+import com.clougence.clouddm.ds.ads.i18n.AdsMyConfigI18nKeys;
 import com.clougence.clouddm.ds.ads.i18n.AdsMyDsI18nKeys;
 import com.clougence.clouddm.ds.ads.language.ads4my.AdsMyLanguageSpi;
 import com.clougence.clouddm.ds.ads.resource.ads4my.AdsMyEditorResourceSpi;
@@ -47,10 +48,11 @@ import com.clougence.schema.SchemaFramework;
 import com.clougence.schema.SchemaPlugin;
 
 /** @author mode 2024/12/25 15:13 */
-@Plugin(includePackages = { "com.clougence.clouddm.dsfamily.execute.*",      //
+@Plugin(name = "i18n::" + AdsMyDsI18nKeys.PLUGIN_NAME_ADB_FOR_MYSQL,         //
+        includePackages = { "com.clougence.clouddm.dsfamily.execute.*",      //
                             "com.clougence.clouddm.dsfamily.mysql.execute.*",//
                             "com.clougence.clouddm.ds.ads.execute.*"         //
-}, dsProduct = DataSourceType.AdbForMySQL)
+        }, dsProduct = DataSourceType.AdbForMySQL)
 public class AdsMyPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
 
     @Override
@@ -89,6 +91,7 @@ public class AdsMyPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
     private void configUi(DsPluginBinder dsPlugin) {
         //initI18n
         dsPlugin.bindPluginI18n(AdsMyDsI18nKeys.class);
+        dsPlugin.bindPluginI18n(AdsMyConfigI18nKeys.class);
         //sqlBuilder
         dsPlugin.bindDsSqlBuilder(AdbMyEditorProvider.INSTANCE);
         dsPlugin.bindDsDialect(AdbMySqlDialect.INSTANCE);

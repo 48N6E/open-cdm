@@ -26,6 +26,7 @@ import com.clougence.clouddm.ds.polardb.dsconf.pormy.PorMyConfigSpi;
 import com.clougence.clouddm.ds.polardb.dsconf.pormy.PorMySerializationSpi;
 import com.clougence.clouddm.ds.polardb.execute.pormy.PorMySessionFactory;
 import com.clougence.clouddm.ds.polardb.execute.pormy.PorMySupportSpi;
+import com.clougence.clouddm.ds.polardb.i18n.PorMyConfigI18nKeys;
 import com.clougence.clouddm.ds.polardb.i18n.PorMyDsI18nKeys;
 import com.clougence.clouddm.ds.polardb.language.pormy.PorMyLanguageSpi;
 import com.clougence.clouddm.ds.polardb.resource.PorMyEditorResourceSpi;
@@ -48,10 +49,11 @@ import com.clougence.schema.SchemaFramework;
 import com.clougence.schema.SchemaPlugin;
 
 /** @author mode 2024/12/25 15:13 */
-@Plugin(includePackages = { "com.clougence.clouddm.dsfamily.execute.*",      //
+@Plugin(name = "i18n::" + PorMyDsI18nKeys.PLUGIN_NAME_POLARDB_MYSQL, //
+        includePackages = { "com.clougence.clouddm.dsfamily.execute.*",      //
                             "com.clougence.clouddm.dsfamily.mysql.execute.*",//
                             "com.clougence.clouddm.ds.polardb.execute.pormy.*"//
-}, dsProduct = DataSourceType.PolarDbMySQL)
+        }, dsProduct = DataSourceType.PolarDbMySQL)
 public class PorMyDsPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
 
     @Override
@@ -91,6 +93,7 @@ public class PorMyDsPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
     private void configUi(DsPluginBinder dsPlugin) {
         //initI18n
         dsPlugin.bindPluginI18n(PorMyDsI18nKeys.class);
+        dsPlugin.bindPluginI18n(PorMyConfigI18nKeys.class);
         //sqlBuilder
         dsPlugin.bindDsSqlBuilder(MyEditorProvider.INSTANCE);
         dsPlugin.bindDsDialect(PolarDBMyDialect.INSTANCE);

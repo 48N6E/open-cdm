@@ -19,6 +19,11 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.clougence.clouddm.base.metadata.ds.ConfigValType;
+import com.clougence.clouddm.base.metadata.ds.SecurityType;
+import com.clougence.clouddm.console.web.component.config.RootUserConfig;
+import com.clougence.clouddm.console.web.component.config.UserConfigKvDef;
+import com.clougence.clouddm.console.web.component.dsconfig.mode.DsConfigKvDef;
 import com.clougence.clouddm.console.web.constants.LoginAuthType;
 import com.clougence.clouddm.console.web.constants.RdpTicketProcessActivityStatus;
 import com.clougence.clouddm.console.web.global.i18n.DmI18nUtils;
@@ -38,10 +43,9 @@ import com.clougence.clouddm.platform.dal.model.approval.ApprovalProcessStatus;
 import com.clougence.clouddm.platform.dal.model.approval.DmApprovalProcessActivityDO;
 import com.clougence.clouddm.platform.dal.model.approval.DmApprovalProcessDO;
 import com.clougence.clouddm.platform.dal.model.auth.*;
-import com.clougence.clouddm.platform.dal.model.datasource.DmDsConfigKv4RdpDO;
+import com.clougence.clouddm.platform.dal.model.datasource.DmDsConfigKv4DmDO;
 import com.clougence.clouddm.platform.dal.model.datasource.DmDsDO;
 import com.clougence.clouddm.platform.dal.model.system.DmSysUserConfDO;
-import com.clougence.clouddm.platform.dal.model.system.KvConfValType;
 import com.clougence.clouddm.sdk.approval.ApprovalProvider;
 import com.clougence.clouddm.sdk.model.analysis.resource.AuthBrowseObject;
 import com.clougence.clouddm.sdk.security.auth.AuthInfo;
@@ -52,7 +56,6 @@ import com.clougence.clouddm.sdk.service.approval.ApprovalActivityStatus;
 import com.clougence.clouddm.sdk.service.config.ConfigData;
 import com.clougence.clouddm.sdk.service.config.RoleData;
 import com.clougence.clouddm.sdk.service.config.UserData;
-import com.clougence.rdp.global.config.user.UserDefinedConfig;
 import com.clougence.utils.ExceptionUtils;
 import com.clougence.utils.JsonUtils;
 import com.clougence.utils.StringUtils;
@@ -310,26 +313,122 @@ public class RdpConvertUtils {
         }
     }
 
-    public static RdpDsKvConfigVO convertToDsKvConfigVO(DmDsConfigKv4RdpDO config) {
-        RdpDsKvConfigVO vo = new RdpDsKvConfigVO();
+    public static RdpDsKvConfigVO convertToDsKvConfigVO(DsConfigKvDef config) {
+        return convertToDsKvConfigVO(config, null);
+    }
 
-        if (!config.isSecret()) {
-            vo.setConfigValue(config.getConfigValue());
+    public static List<DefaultDsKvConfigVO> convertToDefaultDsKvConfigVOList(List<DsConfigKvDef> configs) {
+        if (configs == null) {
+            return Collections.emptyList();
+        }
+        return configs.stream().map(RdpConvertUtils::convertToDefaultDsKvConfigVO).collect(Collectors.toList());
+    }
+
+    public static DefaultDsKvConfigVO convertToDefaultDsKvConfigVO(DsConfigKvDef config) {
+        DefaultDsKvConfigVO vo = new DefaultDsKvConfigVO();
+        vo.setDescription(DmI18nUtils.getMessage(config.getDescKey()));
+        vo.setConfigName(config.getConfigName());
+        vo.setConfigGroup(config.getConfigGroup());
+        vo.setValueRequire(config.isValueRequire());
+        vo.setDefaultValue(config.getDefaultValue());
+        vo.setConfValType(config.getConfValType() == null ? ConfigValType.TEXT : config.getConfValType());
+        vo.setLazy(config.isLazy());
+        return vo;
+    }
+
+    public static List<com.clougence.clouddm.console.web.model.vo.DsSecurityOption> convertToDsSecurityOptions(List<SecurityType> securityTypes) {
+        List<com.clougence.clouddm.console.web.model.vo.DsSecurityOption> result = new ArrayList<>();
+        if (securityTypes == null) {
+            return result;
         }
 
-        vo.setId(config.getId());
+        for (SecurityType securityType : securityTypes) {
+            result.add(convertToDsSecurityOption(securityType));
+        }
+        return result;
+    }
+
+    private static com.clougence.clouddm.console.web.model.vo.DsSecurityOption convertToDsSecurityOption(SecurityType securityType) {
+        com.clougence.clouddm.console.web.model.vo.DsSecurityOption.DsSecurityOptionBuilder builder = com.clougence.clouddm.console.web.model.vo.DsSecurityOption.builder()
+            .securityType(securityType)
+            .securityTypeI18nName(securityType == null ? null : DmI18nUtils.getMessage(securityType.getI18nKey()));
+
+        if (securityType == null) {
+            return builder.build();
+        }
+
+        return switch (securityType) {
+            case ONLY_USER -> builder.needUserName(true).needPassword(false).build();
+            case ONLY_PASSWD -> builder.needUserName(false).needPassword(true).defaultCheck(true).build();
+            case USER_PASSWD -> builder.needUserName(true).needPassword(true).defaultCheck(true).build();
+            case AK_SK -> builder.needAkSk(true).defaultCheck(true).build();
+            case API_KEY -> builder.needApiKey(true).defaultCheck(true).build();
+            default -> builder.needUserName(false).needPassword(false).build();
+        };
+    }
+
+    public static RdpUserConfigVO convertToUserConfigVO(UserConfigKvDef config) {
+        return convertToUserConfigVO(config, null);
+    }
+
+    public static RdpUserConfigVO convertToUserConfigVO(UserConfigKvDef config, DmSysUserConfDO configValue) {
+        RdpUserConfigVO vo = new RdpUserConfigVO();
+        String value = configValue == null ? config.getConfigValue() : configValue.getConfigValue();
+        if (config.isSecret()) {
+            vo.setSecret(true);
+        } else {
+            vo.setConfigValue(value);
+        }
+
+        vo.setDescription(DmI18nUtils.getMessage(config.getDescKey()));
+        vo.setConfigName(config.getConfigName());
+        vo.setUserConfigTagType(config.getUserConfigTagType());
+        if (config.getUserConfigTagType() != null) {
+            vo.setI18nOfTagType(DmI18nUtils.getMessage("USER_CONFIG_TAG_" + config.getUserConfigTagType().name()));
+        }
+
+        vo.setConfBelong(config.getConfBelong().getCloudAliasName());
+        vo.setUid(config.getUid());
+        vo.setDefaultValue(config.getDefaultValue());
+        vo.setReadOnly(config.isReadOnly());
+        vo.setValueRange(config.getValueRange());
+        vo.setConfValType(config.getConfValType() == null ? ConfigValType.TEXT : config.getConfValType());
+        return vo;
+    }
+
+    public static RdpUserConfigVO convertToUserConfigVO(DmSysUserConfDO config) {
+        RdpUserConfigVO vo = new RdpUserConfigVO();
+        vo.setConfigValue(config.getConfigValue());
+        vo.setConfigName(config.getConfigName());
+        vo.setUid(config.getUid());
+        return vo;
+    }
+
+    public static RdpDsKvConfigVO convertToDsKvConfigVO(DsConfigKvDef config, DmDsConfigKv4DmDO configValue) {
+        RdpDsKvConfigVO vo = new RdpDsKvConfigVO();
+
+        if (configValue == null) {
+            vo.setConfigValue(config.getConfigValue());
+        } else {
+            vo.setId(configValue.getId());
+            vo.setConfigValue(configValue.getConfigValue());
+        }
+        if (config.isSecret()) {
+            vo.setConfigValue(null);
+        }
+
         vo.setSecret(config.isSecret());
+        vo.setLazy(config.isLazy());
         vo.setReadOnly(config.isReadOnly());
         vo.setDescription(DmI18nUtils.getMessage(config.getDescKey()));
         vo.setDefaultValue(config.getDefaultValue());
         vo.setValueRequire(config.isValueRequire());
         vo.setValueValidRegex(config.getValueValidRegex());
-        vo.setValueAdvance(config.getValueAdvance());
 
         if (config.getConfValType() != null) {
             vo.setConfValType(config.getConfValType());
         } else {
-            vo.setConfValType(KvConfValType.TEXT);
+            vo.setConfValType(ConfigValType.TEXT);
         }
 
         vo.setConfigGroup(config.getConfigGroup());
@@ -344,20 +443,12 @@ public class RdpConvertUtils {
         vo.setInstanceId(dsDO.getInstanceId());
         vo.setInstanceDesc(dsDO.getInstanceDesc());
         vo.setDataSourceType(dsDO.getDataSourceType());
-        if (dsDO.getDeployType() != null) {
-            vo.setDeployType(dsDO.getDeployType());
-            vo.setDeployTypeI18n(DmI18nUtils.getMessage(dsDO.getDeployType().name()));
-        }
-
-        vo.setInfoFetchType(dsDO.getInfoFetchType());
         vo.setVersion(dsDO.getVersion());
         vo.setGmtCreate(dsDO.getGmtCreate());
-        vo.setHostType(dsDO.getHostType());
-        vo.setPrivateHost(dsDO.getPrivateHost());
-        vo.setPublicHost(dsDO.getPublicHost());
+        vo.setHost(dsDO.getHost());
 
-        vo.setHasPassword(StringUtils.isNotBlank(dsDO.getAccount()) || StringUtils.isNotBlank(dsDO.getPassword()));
-        vo.setAccountName(dsDO.getAccount());
+        vo.setHasPassword(StringUtils.isNotBlank(dsDO.getAccessKey()) || StringUtils.isNotBlank(dsDO.getSecretKey()));
+        vo.setAccountName(dsDO.getAccessKey());
         vo.setLifeCycleState(dsDO.getLifeCycleState());
         vo.setSecurityType(dsDO.getSecurityType());
         return vo;
@@ -482,7 +573,6 @@ public class RdpConvertUtils {
         ConfigData data = new ConfigData();
         data.setConfigName(kvConfig.getConfigName());
         data.setConfigValue(kvConfig.getConfigValue());
-        data.setDefaultValue(kvConfig.getDefaultValue());
         return data;
     }
 
@@ -531,11 +621,11 @@ public class RdpConvertUtils {
     public static String convertToApprovalEnableConfigKey(ApprovalProvider type) {
         switch (type) {
             case Feishu:
-                return UserDefinedConfig.Fields.feishuEnableApprovalService;
+                return RootUserConfig.Fields.feishuEnableApprovalService;
             case Wechat:
-                return UserDefinedConfig.Fields.wechatEnableApprovalService;
+                return RootUserConfig.Fields.wechatEnableApprovalService;
             case DingTalk:
-                return UserDefinedConfig.Fields.dingEnableApprovalService;
+                return RootUserConfig.Fields.dingEnableApprovalService;
             case Internal:
             case Custom:
             default:

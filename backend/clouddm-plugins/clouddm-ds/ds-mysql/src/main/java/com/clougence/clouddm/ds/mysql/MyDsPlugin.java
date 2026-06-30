@@ -35,6 +35,7 @@ import com.clougence.clouddm.dsfamily.mysql.definition.ui.template.MyCmdTemplate
 import com.clougence.clouddm.dsfamily.mysql.dialect.MySqlDialect;
 import com.clougence.clouddm.dsfamily.mysql.execute.MySessionSpi;
 import com.clougence.clouddm.dsfamily.mysql.execute.MySupportSpi;
+import com.clougence.clouddm.dsfamily.mysql.i18n.MyConfigI18nKeys;
 import com.clougence.clouddm.dsfamily.mysql.i18n.MyDsI18nKeys;
 import com.clougence.clouddm.dsfamily.mysql.language.MyLanguageSpi;
 import com.clougence.clouddm.dsfamily.mysql.resource.MyEditorResourceSpi;
@@ -48,10 +49,11 @@ import com.clougence.schema.SchemaFramework;
 import com.clougence.schema.SchemaPlugin;
 
 /** @author mode 2024/12/25 15:13 */
-@Plugin(includePackages = { "com.clougence.clouddm.dsfamily.execute.*",      //
+@Plugin(name = "i18n::" + MyDsI18nKeys.PLUGIN_NAME_MYSQL,                    //
+        includePackages = { "com.clougence.clouddm.dsfamily.execute.*",      //
                             "com.clougence.clouddm.dsfamily.mysql.execute.*",//
                             "com.clougence.clouddm.ds.mysql.execute.*"       //
-}, dsProduct = DataSourceType.MySQL)
+        }, dsProduct = DataSourceType.MySQL)
 public class MyDsPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
 
     @Override
@@ -90,6 +92,7 @@ public class MyDsPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
     private void configUi(DsPluginBinder dsPlugin) {
         //initI18n
         dsPlugin.bindPluginI18n(MyDsI18nKeys.class);
+        dsPlugin.bindPluginI18n(MyConfigI18nKeys.class);
         //sqlBuilder
         dsPlugin.bindDsSqlBuilder(MyEditorProvider.INSTANCE);
         dsPlugin.bindDsDialect(MySqlDialect.INSTANCE);

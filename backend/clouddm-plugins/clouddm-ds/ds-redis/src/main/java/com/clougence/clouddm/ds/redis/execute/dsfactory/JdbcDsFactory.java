@@ -49,17 +49,9 @@ public class JdbcDsFactory implements DsFactory<Connection> {
         String connTimeoutMs = dsConfig.getProperty(DsConfigKeys.CONNECT_TIMEOUT_MS.getConfigKey());
         String soTimeoutSec = dsConfig.getProperty(DsConfigKeys.SO_TIMEOUT_SEC.getConfigKey());
         String clientName = dsConfig.getProperty(DsConfigKeys.CLIENT_NAME.getConfigKey());
-        String defaultSchema;
-        if (StringUtils.isNotBlank(dsConfig.getProperty(DsConfigKeys.DEFAULT_DATABASE.getConfigKey()))) {
-            defaultSchema = dsConfig.getProperty(DsConfigKeys.DEFAULT_DATABASE.getConfigKey());
-        } else {
-            defaultSchema = dsConfig.getProperty(DsConfigKeys.DEFAULT_SCHEMA.getConfigKey());
-        }
+        String defaultSchema = dsConfig.getProperty(DsConfigKeys.DEFAULT_DATABASE.getConfigKey());
         String clientEncoding = dsConfig.getProperty(DsConfigKeys.CLIENT_ENCODING.getConfigKey());
-        String clientTimeZone = dsConfig.getProperty(DsConfigKeys.CLIENT_TIME_ZONE.getConfigKey());
         String tcpKeepAlive = dsConfig.getProperty(DsConfigKeys.TCP_KEEP_ALIVE.getConfigKey());
-        String autoCommit = dsConfig.getProperty(DsConfigKeys.AUTO_COMMIT.getConfigKey());
-
         if (StringUtils.isNotBlank(username)) {
             props.put(JedisKeys.USERNAME, username);
         }
@@ -79,9 +71,6 @@ public class JdbcDsFactory implements DsFactory<Connection> {
         }
         if (StringUtils.isNotBlank(soTimeoutSec)) {
             props.put(JedisKeys.SO_TIMEOUT, Long.parseLong(soTimeoutSec) * 1000);
-        }
-        if (StringUtils.isNotBlank(clientTimeZone)) {
-            props.put(JedisKeys.TIME_ZONE, clientTimeZone);
         }
         if (StringUtils.isNotBlank(tcpKeepAlive)) {
             props.put("tcpKeepAlive", tcpKeepAlive);

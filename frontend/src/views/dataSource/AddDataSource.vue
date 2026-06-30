@@ -1,14 +1,6 @@
 <template>
-  <div class="content-wrapper">
-    <Breadcrumb>
-      <BreadcrumbItem to="/datasource">{{ $t('shu-ju-yuan-guan-li') }}</BreadcrumbItem>
-      <BreadcrumbItem>{{ $t('xin-zeng-shu-ju-yuan') }}</BreadcrumbItem>
-    </Breadcrumb>
+  <div class="content-wrapper add-datasource-page">
     <div class="add-datasource-wrapper">
-      <Steps class="add-dataSource-step" :current="currentStep > 1 ? 1 : currentStep">
-        <Step :title="$t('xuan-ze-shu-ju-yuan')"></Step>
-        <Step :title="$t('xin-zeng-shu-ju-yuan')"></Step>
-      </Steps>
       <div class="add-datasource-content">
         <DataSourceInfo
           :addDataSourceForm="addDataSourceForm"
@@ -18,26 +10,36 @@
           :show-query-config="shouldAutoEnableFeatures"
           :auto-enable-features="shouldAutoEnableFeatures"
           :driver-family-map="driverFamilyMap"
+          :ds-id="editDataSourceId"
+          :edit-mode="editMode"
           :set-security-setting="setSecuritySetting"
           @driver-status-change="handleDriverStatusChange"
+          @config-loaded="handleConfigLoaded"
         ></DataSourceInfo>
         <SuccessAdd v-if="currentStep > 2"></SuccessAdd>
       </div>
-    </div>
-    <div>
       <div class="add-dataSource-tools">
-        <Button v-if="currentStep === 0" @click="handleReturn">
-          {{ $t('fan-hui-shu-ju-yuan-guan-li') }}
-        </Button>
-        <Button type="primary" @click="handleStep('next')" v-if="currentStep === 0">
-          {{ $t('xia-yi-bu') }}
-        </Button>
-        <Button v-if="currentStep === 1" @click="handleStep('pre')">
-          {{ $t('shang-yi-bu') }}
-        </Button>
-        <Button type="primary" @click="handleAddDataSource" :loading="addDatasourceLoading" :disabled="disableAddDataSource" v-if="currentStep === 1">
-          {{ $t('xin-zeng-shu-ju-yuan') }}
-        </Button>
+        <div class="add-dataSource-actions">
+          <Button type="primary" @click="handleStep('next')" v-if="currentStep === 0">
+            {{ $t('xia-yi-bu') }}
+          </Button>
+          <Button
+            type="primary"
+            @click="handleAddDataSource"
+            :loading="addDatasourceLoading"
+            :disabled="disableAddDataSource"
+            v-if="currentStep === 1"
+          >
+            {{ editMode ? $t('bao-cun') : $t('xin-zeng-shu-ju-yuan') }}
+          </Button>
+          <Button @click="handleTestConnection" :loading="testConnectionLoading" v-if="currentStep === 1">
+            {{ $t('ce-shi-lian-jie') }}
+          </Button>
+        </div>
+        <span v-if="testConnectionHasResult" class="test-connection-inline-msg" :class="testConnectionSuccess ? 'tc-success' : 'tc-fail'">
+          <Icon :type="testConnectionSuccess ? 'ios-checkmark-circle' : 'ios-close-circle'" />
+          {{ testConnectionMessage }}
+        </span>
       </div>
     </div>
   </div>
@@ -45,7 +47,7 @@
 <script>
 import DataSourceInfo from '@/components/function/addDataSource/DataSourceInfo';
 import SuccessAdd from '@/components/function/addDataSource/SuccessAdd';
-import { isDb2, isHana, separatePort, isMySQL } from '@/utils';
+import { separatePort, isMySQL } from '@/utils';
 import { isPostgreSQL } from '@/const/dataSource';
 import { mapGetters, mapState } from 'vuex';
 import { cloneDeep as deepClone } from '@/utils/lodash';
@@ -82,7 +84,6 @@ const EMPTY_DATA_SOURCE_FORM = {
   region: '',
   queryClusterId: '',
   queryHostType: 'PUBLIC',
-  instanceType: 'SELF_MAINTENANCE',
   rdsList: [],
   aliyunAk: '',
   aliyunSk: '',
@@ -101,17 +102,6 @@ const EMPTY_DATA_SOURCE_FORM = {
   service: '',
   accountRole: '',
   asSysDba: false,
-  securityFile: '',
-  caFile: '',
-  clientSecurityFile: '',
-  secretFile: '',
-  secretFilePassword: '',
-  clientTrustStorePassword: '',
-  keystoreFile: '',
-  tlsTrustStoreFile: '',
-  tlsTrustStoreFilePassword: '',
-  tlsKeystoreFile: '',
-  tlsKeystoreFilePassword: '',
   accessKey: '',
   secretKey: ''
 };
@@ -137,7 +127,11 @@ export default {
       addDataSourceForm: deepClone(EMPTY_DATA_SOURCE_FORM),
       securitySetting: [],
       driverReadyForAdd: true,
-      driverRequiredForAdd: false
+      driverRequiredForAdd: false,
+      testConnectionLoading: false,
+      testConnectionHasResult: false,
+      testConnectionSuccess: false,
+      testConnectionMessage: ''
     };
   },
   computed: {
@@ -154,6 +148,13 @@ export default {
     shouldAutoEnableFeatures() {
       return !this.isDesktop && this.$route?.path === '/datasource/add';
     },
+    editMode() {
+      return this.$route.query.mode === 'edit' && !!this.editDataSourceId;
+    },
+    editDataSourceId() {
+      const dsId = Number(this.$route.query.dsId);
+      return Number.isFinite(dsId) && dsId > 0 ? dsId : null;
+    },
     disableAddDataSource() {
       return this.driverRequiredForAdd && !this.driverReadyForAdd;
     }
@@ -164,6 +165,21 @@ export default {
     store.state.firstAddDataSource = true;
     store.state.selectedCluster = {};
     store.state.clusterList = [];
+  },
+  watch: {
+    '$route.query.dsType': {
+      handler() {
+        this.syncStepFromRoute();
+      }
+    },
+    '$route.query.dsId': {
+      handler() {
+        this.syncStepFromRoute();
+      }
+    }
+  },
+  mounted() {
+    this.syncStepFromRoute();
   },
   methods: {
     handleSetEmptyDatasourceForm() {
@@ -177,9 +193,24 @@ export default {
 
       this.addDataSourceForm.publicHost = visibleHost.host || '';
       this.addDataSourceForm.publicPort = visibleHost.port || '';
-      this.addDataSourceForm.host = visibleHost.host || '';
-      this.addDataSourceForm.port = visibleHost.port || '';
+      if (!this.addDataSourceForm.host) {
+        this.addDataSourceForm.host = visibleHost.host || '';
+      }
+      if (!this.addDataSourceForm.port) {
+        this.addDataSourceForm.port = visibleHost.port || '';
+      }
+      this.addDataSourceForm.resolvedHost = this.resolvePrimaryHost();
       this.addDataSourceForm.queryHostType = 'PUBLIC';
+    },
+    resolvePrimaryHost() {
+      if (this.addDataSourceForm.resolvedHost) {
+        return this.addDataSourceForm.resolvedHost;
+      }
+      const isSeparate = this.separatePort(this.addDataSourceForm.type) || this.addDataSourceForm.type === 'Db2Fori';
+      if (isSeparate && this.addDataSourceForm.host && this.addDataSourceForm.port) {
+        return `${this.addDataSourceForm.host}:${this.addDataSourceForm.port}`;
+      }
+      return this.addDataSourceForm.host || this.addDataSourceForm.publicHost || '';
     },
     setSecuritySetting(setting) {
       this.securitySetting = setting;
@@ -188,10 +219,20 @@ export default {
       this.driverRequiredForAdd = !!status?.required;
       this.driverReadyForAdd = !this.driverRequiredForAdd || !!status?.ready;
     },
+    setActionMessage(success, message) {
+      this.testConnectionHasResult = true;
+      this.testConnectionSuccess = !!success;
+      this.testConnectionMessage = message || '';
+    },
+    clearActionMessage() {
+      this.testConnectionHasResult = false;
+      this.testConnectionSuccess = false;
+      this.testConnectionMessage = '';
+    },
     ensureDriverReadyForAdd() {
       const driverReady = this.$refs.dataSourceInfo?.isDriverReadyForSubmit?.() ?? this.driverReadyForAdd;
       if (this.driverRequiredForAdd && !driverReady) {
-        this.$Message.warning(this.$t('initialization.mysqlDriverDownloadRequired'));
+        this.setActionMessage(false, this.$t('initialization.mysqlDriverDownloadRequired'));
         return false;
       }
 
@@ -200,6 +241,7 @@ export default {
     handleStep(type) {
       if (type === 'pre') {
         this.currentStep--;
+        this.clearActionMessage();
         // if (this.currentStep === 1) {
         //   this.addDataSourceForm.rdsList.map((item) => {
         //     if (item.clusters) {
@@ -215,6 +257,8 @@ export default {
           }
           this.securitySetting = this.$refs.dataSourceInfo.securitySetting;
           this.currentStep++;
+          this.clearActionMessage();
+          this.updateAddDsRoute();
         });
       } else if (this.currentStep === 1) {
         if (this.isManual || this.addDataSourceForm.ifAkSK === 'false') {
@@ -278,163 +322,69 @@ export default {
 
       this.$refs.dataSourceInfo.$refs.addLocalDs.validate((val) => {
         if (val) {
+          this.clearActionMessage();
+          this.$refs.dataSourceInfo?.syncAddDsUiFormToKvConfigs?.();
           this.syncPrimaryHostFields();
           this.handleAdd();
         }
       });
     },
     handleAdd() {
-      if (!this.addDataSourceForm.host && !this.addDataSourceForm.publicHost) {
-        this.$Modal.warning({
-          title: this.$t('tian-jia-shu-ju-yuan-ti-shi'),
-          content: this.$t('qing-tian-xie-wan-zheng-qie-zheng-que-de-shu-ju-yuan-di-zhi')
-        });
-      } else {
-        const { dsKvConfigs } = this.addDataSourceForm;
-        let { connectTypeValue } = this.addDataSourceForm;
-        if (connectTypeValue && typeof connectTypeValue === 'string') {
-          connectTypeValue = connectTypeValue.trim();
-        }
-        const formData = new FormData();
-        const isSeparate = this.separatePort(this.addDataSourceForm.type);
-        let host = isSeparate
-          ? this.addDataSourceForm.host && this.addDataSourceForm.port
-            ? `${this.addDataSourceForm.host}:${this.addDataSourceForm.port}`
-            : ''
-          : this.addDataSourceForm.host;
-        if (this.addDataSourceForm.type === 'Db2Fori') {
-          host =
-            this.addDataSourceForm.host && this.addDataSourceForm.port
-              ? `${this.addDataSourceForm.host}:${this.addDataSourceForm.port}`
-              : this.addDataSourceForm.host;
-        }
-        const publicHost = isSeparate
-          ? this.addDataSourceForm.publicHost && this.addDataSourceForm.publicPort
-            ? `${this.addDataSourceForm.publicHost}:${this.addDataSourceForm.publicPort}`
-            : ''
-          : this.addDataSourceForm.publicHost;
-
-        const kvConfigs = [];
-        if (dsKvConfigs.length) {
-          dsKvConfigs.forEach((config) => {
-            const { configName, currentCount, defaultValue } = config;
-            kvConfigs.push({
-              configName,
-              configValue: currentCount || defaultValue
-            });
-          });
-        }
-        const DataSourceAddData = {
-          host: publicHost && this.addDataSourceForm.type === 'Oracle' ? `${publicHost}:${connectTypeValue}` : publicHost,
-          privateHost: '',
-          publicHost: publicHost && this.addDataSourceForm.type === 'Oracle' ? `${publicHost}:${connectTypeValue}` : publicHost,
-          type: this.addDataSourceForm.type,
-          connectType: this.addDataSourceForm.connectType,
-          deployType: this.addDataSourceForm.instanceType,
-          instanceDesc: this.addDataSourceForm.instanceDesc,
-          hostType: 'PUBLIC',
-          account:
-            DataSourceGroup.oracle.indexOf(this.addDataSourceForm.type) > -1
-              ? this.addDataSourceForm.asSysDba
-                ? `${this.addDataSourceForm.account} as SYSDBA`
-                : this.addDataSourceForm.account
-              : this.addDataSourceForm.account,
-          instanceId: this.addDataSourceForm.instanceId,
-          password: this.addDataSourceForm.password,
-          securityType: this.addDataSourceForm.securityType,
-          accessKey: this.addDataSourceForm.accessKey,
-          secretKey: this.addDataSourceForm.secretKey,
-          dbName: this.addDataSourceForm.dbName || this.addDataSourceForm.noValidateDbName,
-          clientTrustStorePassword: this.addDataSourceForm.clientTrustStorePassword,
-          dsKvConfigs: kvConfigs,
-          // extraData: {
-          //   hdfsIp: this.addDataSourceForm.hdfsIp,
-          //   hdfsPort: this.addDataSourceForm.hdfsPort,
-          //   hdfsDwDir: this.addDataSourceForm.hdfsDwDir,
-          //   hdfsPrincipal: this.addDataSourceForm.hdfsPrincipal
-          // },
-          driver: this.addDataSourceForm.driver,
-          envId: this.addDataSourceForm.envId,
-          infoFetchType: 'MANUALLY_FILL',
-          secretFilePassword: this.addDataSourceForm?.secretFilePassword || ''
-        };
-        Object.keys(DataSourceAddData).forEach((item) => {
-          if (typeof DataSourceAddData[item] === 'string') {
-            DataSourceAddData[item] = DataSourceAddData[item].trim();
-          }
-        });
-
-        // Process different types of source field map
-        switch (this.addDataSourceForm.type) {
-          // tls type
-          case 'MySQL':
-          case 'Kafka':
-          case 'Tunnel':
-          case 'AutoMQ':
-            DataSourceAddData.securityFilePassword = this.addDataSourceForm?.tlsTrustStoreFilePassword || '';
-            DataSourceAddData.clientSecurityFilePassword = this.addDataSourceForm?.tlsKeystoreFilePassword || '';
-            this.addDataSourceForm.securityFile = this.addDataSourceForm.tlsTrustStoreFile;
-            this.addDataSourceForm.clientSecurityFile = this.addDataSourceForm.tlsKeystoreFile;
-            break;
-          // certificate
-          case 'PostgreSQL':
-            this.addDataSourceForm.secretFile = this.addDataSourceForm.clientSecretFile;
-            break;
-          default:
-            break;
-        }
-
-        formData.append('secretFile', this.addDataSourceForm?.secretFile || '');
-        formData.append('securityFile', this.addDataSourceForm?.securityFile || '');
-        formData.append('clientSecurityFile', this.addDataSourceForm?.clientSecurityFile || '');
-        formData.append('DataSourceAddData', JSON.stringify(DataSourceAddData));
-
-        this.addDatasourceLoading = true;
-        this.$services.rdpDataSourceAdd({ data: formData }).then(async (res) => {
+      const payload = this.$refs.dataSourceInfo?.buildDsSubmitPayload?.();
+      this.addDatasourceLoading = true;
+      const serviceName = this.editMode ? 'rdpDataSourceUpdateDs' : 'rdpDataSourceAddDs';
+      this.$services[serviceName]({ data: payload })
+        .then(async (res) => {
           this.addDatasourceLoading = false;
           if (res.success) {
-            await this.enableDatasourceFeatures(res.data);
-            this.currentStep = 4;
+            if (this.editMode) {
+              this.$Message.success(this.$t('xiu-gai-cheng-gong'));
+              this.$router.push({ path: '/datasource' });
+            } else {
+              this.currentStep = 4;
+            }
+            return;
           }
+          this.setActionMessage(false, res.msg || this.$t('shu-ju-yuan-tian-jia-shi-bai'));
+        })
+        .catch((error) => {
+          this.addDatasourceLoading = false;
+          this.setActionMessage(false, error?.message || this.$t('shu-ju-yuan-tian-jia-shi-bai'));
         });
-      }
     },
-    async enableDatasourceFeatures(dataSourceId) {
-      if (!this.shouldAutoEnableFeatures || !dataSourceId) {
+    handleTestConnection() {
+      if (!this.ensureDriverReadyForAdd()) {
         return;
       }
-
-      if (!this.addDataSourceForm.queryClusterId) {
-        this.$Message.warning(this.$t('shu-ju-cha-xun-wei-kai-qi'));
-        return;
-      }
-
-      const queryRes = await this.$services.dmDataSourceEnableDsQuery({
-        data: {
-          dataSourceId,
-          clusterId: this.addDataSourceForm.queryClusterId,
-          hostType: this.addDataSourceForm.queryHostType
+      this.$refs.dataSourceInfo.$refs.addLocalDs.validate((valid) => {
+        if (!valid) {
+          return;
         }
+        const payload = this.$refs.dataSourceInfo?.buildDsSubmitPayload?.();
+        this.testConnectionLoading = true;
+        this.clearActionMessage();
+        this.$services
+          .dmDataSourceConnectDs({ data: payload })
+          .then((res) => {
+            const result = res.data || {};
+            const connectSuccess = res.success && result.success !== false;
+            this.setActionMessage(
+              connectSuccess,
+              connectSuccess ? this.$t('ce-shi-lian-jie-cheng-gong') : result.message || res.msg || this.$t('ce-shi-lian-jie-shi-bai')
+            );
+          })
+          .catch((error) => {
+            this.setActionMessage(false, error?.message || this.$t('ce-shi-lian-jie-shi-bai'));
+          })
+          .finally(() => {
+            this.testConnectionLoading = false;
+          });
       });
-
-      if (!queryRes.success) {
-        this.$Message.warning(this.$t('shu-ju-cha-xun-wei-kai-qi'));
-        return;
-      }
-
-      const devopsRes = await this.$services.dmDataSourceEnableDsDevOps({
-        data: {
-          dataSourceId
-        }
-      });
-
-      if (!devopsRes.success) {
-        this.$Message.warning('CI/CD 未开启');
-      }
     },
     handleAddPersonalDataSource(testDs = false) {
       this.$refs.dataSourceInfo.$refs.addLocalDs.validate((val) => {
         if (val) {
+          this.$refs.dataSourceInfo?.syncAddDsUiFormToKvConfigs?.();
           this.syncPrimaryHostFields();
           this.handleAddPersonal(testDs);
         }
@@ -477,7 +427,6 @@ export default {
           publicHost: publicHost && this.addDataSourceForm.type === 'Oracle' ? `${publicHost}:${connectTypeValue}` : publicHost,
           type: this.addDataSourceForm.type,
           connectType: this.addDataSourceForm.connectType,
-          deployType: this.addDataSourceForm.instanceType,
           instanceDesc: this.addDataSourceForm.instanceDesc,
           hostType: 'PUBLIC',
           account:
@@ -489,11 +438,7 @@ export default {
           instanceId: this.addDataSourceForm.instanceId,
           password: this.addDataSourceForm.password,
           securityType: this.addDataSourceForm.securityType,
-          dbName:
-            isDb2(this.addDataSourceForm.type) || isHana(this.addDataSourceForm.type)
-              ? this.addDataSourceForm.dbName
-              : this.addDataSourceForm.noValidateDbName,
-          clientTrustStorePassword: this.addDataSourceForm.clientTrustStorePassword,
+          dbName: this.addDataSourceForm.dbName || this.addDataSourceForm.noValidateDbName,
           dsKvConfigs: kvConfigs,
           // extraData: {
           //   hdfsIp: this.addDataSourceForm.hdfsIp,
@@ -511,8 +456,6 @@ export default {
           }
         });
 
-        formData.append('secretFile', this.addDataSourceForm.secretFile);
-        formData.append('securityFile', this.addDataSourceForm.securityFile);
         formData.append('rdpConfig', JSON.stringify(DataSourceAddData));
         formData.append(
           'dmConfig',
@@ -546,9 +489,6 @@ export default {
         }
       }
     },
-    handleReturn() {
-      this.$router.push({ path: '/datasource' });
-    },
     handleReset() {
       this.addDataSourceForm = {
         fetchType: 'MANUALLY_FILL',
@@ -557,7 +497,6 @@ export default {
         publicPort: '',
         type: 'MySQL',
         region: '',
-        instanceType: 'SELF_MAINTENANCE',
         rdsList: [],
         aliyunAk: '',
         aliyunSk: '',
@@ -568,7 +507,6 @@ export default {
         account: '',
         hdfsPort: '8020',
         securityType: 'KERBEROS',
-        securityFile: '',
         hdfsDwDir: '/user/hive/warehouse'
       };
     },
@@ -585,61 +523,125 @@ export default {
         return null;
       });
       return security;
+    },
+    syncStepFromRoute() {
+      if (this.editMode) {
+        const dsType = this.$route.query.dsType;
+        if (dsType) {
+          this.addDataSourceForm.type = dsType;
+        }
+        this.currentStep = 1;
+        return;
+      }
+      const dsType = this.$route.query.dsType;
+      if (dsType) {
+        this.addDataSourceForm.type = dsType;
+        this.currentStep = 1;
+        return;
+      }
+      this.currentStep = 0;
+      this.testConnectionHasResult = false;
+    },
+    updateAddDsRoute() {
+      const query = {
+        dsType: this.addDataSourceForm.type
+      };
+      const currentQueryKeys = Object.keys(this.$route.query || {});
+      if (this.$route.query.dsType === query.dsType && currentQueryKeys.length === 1) {
+        return;
+      }
+      this.$router.replace({ path: '/datasource/add', query });
+    },
+    handleConfigLoaded(config) {
+      if (!this.editMode || !config?.instanceId || this.$route.query.instanceId === config.instanceId) {
+        return;
+      }
+      this.$router.replace({
+        path: '/datasource/add',
+        query: {
+          ...this.$route.query,
+          instanceId: config.instanceId
+        }
+      });
     }
   }
 };
 </script>
 <style lang="less">
+.add-datasource-page {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  position: relative;
+  overflow-y: auto;
+  background: #f5f8fb;
+}
+
 .add-datasource-wrapper {
-  background: var(--bg-card);
-  margin-top: 16px;
-  border: 1px solid var(--border-primary);
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100% - 40px);
+  margin: 20px;
+  background: #fff;
+  border: 1px solid #e3eaf2;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(31, 41, 55, 0.04);
+  overflow: visible;
 
   .add-datasource-content {
     /*padding: 20px;*/
-    margin-bottom: 60px;
-  }
-}
-
-.add-dataSource-step {
-  padding: 30px 24px;
-  border-bottom: 1px solid var(--border-primary);
-
-  .ivu-steps-item,
-  .ivu-steps-main {
-    min-width: 0;
-  }
-}
-
-@media screen and (min-width: 992px) {
-  .add-dataSource-step {
-    padding-left: 120px;
-    padding-right: 120px;
-  }
-}
-
-@media screen and (min-width: 1440px) {
-  .add-dataSource-step {
-    padding-left: 380px;
-    padding-right: 380px;
+    flex: 1;
+    min-height: 0;
+    margin-bottom: 0;
+    overflow: visible;
   }
 }
 
 .add-dataSource-tools {
-  /*margin-top: 20px;*/
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  text-align: center;
-  background: var(--bg-card);
-  width: 100%;
-  line-height: 60px;
-  height: 60px;
-  z-index: 99;
-  box-shadow: 0 2px 23px 0 rgba(197, 197, 197, 0.5);
+  position: relative;
+  display: flex;
+  height: 64px;
+  flex: 0 0 64px;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -10px 22px rgba(15, 23, 42, 0.06);
+
+  .add-dataSource-actions {
+    position: absolute;
+    left: 50%;
+    display: flex;
+    align-items: center;
+    transform: translateX(-50%);
+  }
 
   button {
     margin: 0 8px;
+  }
+
+  .test-connection-inline-msg {
+    position: absolute;
+    right: 36px;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: calc(50vw - 120px);
+    overflow: hidden;
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &.tc-success {
+      color: #19be6b;
+    }
+
+    &.tc-fail {
+      color: #ed4014;
+    }
   }
 }
 
