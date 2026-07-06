@@ -3,7 +3,7 @@
 # Build context expected layout:
 #   <ctx>/cgdm-console.tar.gz
 #   <ctx>/shared/console/{console.properties,init.sh}
-FROM eclipse-temurin:17-jre-noble
+FROM cloudcanal-registry.cn-shanghai.cr.aliyuncs.com/clougence/eclipse-temurin:17-jre-noble
 
 ARG DEBIAN_FRONTEND=noninteractive
 

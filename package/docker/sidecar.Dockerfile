@@ -3,7 +3,7 @@
 # Build context expected layout:
 #   <ctx>/cgdm-sidecar.tar.gz
 #   <ctx>/shared/sidecar/{sidecar.properties,global_conf.properties,init.sh,checker.sh}
-FROM eclipse-temurin:17-jre-noble
+FROM cloudcanal-registry.cn-shanghai.cr.aliyuncs.com/clougence/eclipse-temurin:17-jre-noble
 
 ARG DEBIAN_FRONTEND=noninteractive
 
