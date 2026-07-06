@@ -27,16 +27,16 @@ import lombok.Data;
 @Data
 public class ExportOpAuditFO {
 
-    private String         exportId;
-    private String         formatName;
-    private Long           maxRows;
-    private String         requesterUid;
-    private Date           opStart;
-    private Date           opEnd;
-    private SecurityLevel  securityLevel;
-    private String         auditType;
-    private String         resourceType;
-    private String         userNameLike;
-    private String         uid;
-    private String         puid;
+    private String        exportId;
+    private String        formatName;
+    private Long          maxRows;
+    private String        requesterUid;
+    private Date          opStart;
+    private Date          opEnd;
+    private SecurityLevel securityLevel;
+    private String        auditType;
+    private String        resourceType;
+    private String        userNameLike;
+    private String        uid;
+    private String        puid;
 }
