@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.7
 # Multi-arch Dockerfile for the CloudDM Alone (standalone) service.
 # Bundles a MySQL 8.0 server from Ubuntu Noble repositories so the image runs
 # end-to-end without an external database.

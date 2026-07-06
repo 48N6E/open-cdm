@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.7
 # Multi-arch Dockerfile for the CloudDM Console service.
 # Build context expected layout:
 #   <ctx>/cgdm-console.tar.gz
