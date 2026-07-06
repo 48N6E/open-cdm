@@ -187,7 +187,6 @@ import Mapping from '@/views/util';
 import { mapState } from 'vuex';
 import copyMixin from '@/mixins/copyMixin';
 import { EVENT_BUS_NAME_LIST } from '@/utils/eventBusName';
-import { EVENT_BUS_NAME_LIST } from '@/utils/eventBusName';
 import dayjs from '@/utils/dayjsSetup';
 
 export default {
@@ -519,8 +518,8 @@ export default {
           document.body.removeChild(link);
           window.URL.revokeObjectURL(link.href);
         }
-        this.showExport = false;} finally {
-        } finally {
+        this.showExport = false;
+      } finally {
         this.exportLoading = false;
       }
     },
