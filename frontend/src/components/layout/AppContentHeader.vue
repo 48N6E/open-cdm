@@ -3,7 +3,21 @@
     <div class="app-content-header__left">
       <h1 class="app-content-header__title">
         <template v-for="(item, index) in pageBreadcrumbs" :key="`${item.label}-${index}`">
-          <router-link v-if="item.to" class="app-content-header__crumb" :class="{ 'is-current': index === pageBreadcrumbs.length - 1 }" :to="item.to">
+          <button
+            v-if="item.event"
+            type="button"
+            class="app-content-header__crumb app-content-header__crumb-button"
+            :class="{ 'is-current': index === pageBreadcrumbs.length - 1 }"
+            @click="handleBreadcrumbEvent(item.event)"
+          >
+            {{ item.label }}
+          </button>
+          <router-link
+            v-else-if="item.to"
+            class="app-content-header__crumb"
+            :class="{ 'is-current': index === pageBreadcrumbs.length - 1 }"
+            :to="item.to"
+          >
             {{ item.label }}
           </router-link>
           <span v-else class="app-content-header__crumb" :class="{ 'is-current': index === pageBreadcrumbs.length - 1 }">
@@ -14,7 +28,7 @@
       </h1>
     </div>
     <div class="app-content-header__right">
-      <a v-if="showSqlLink" href="/#/sql" class="app-content-header__link">
+      <a v-if="showSqlLink" href="/#/sql" class="app-content-header__link" @click.prevent="handleGoSql">
         <CustomIcon type="icon-v2-SqlLog" size="14px" />
         <span>{{ $t('sql-cha-xun') }}</span>
       </a>
@@ -26,6 +40,9 @@
 <script>
 import { mapGetters, mapState } from 'vuex';
 import AppUserActions from '@/components/layout/AppUserActions';
+import { saveLastWorkbenchRoute } from '@/utils/workbenchRoute';
+import { findDsSupportName } from '@/utils/datasourceSupport';
+import { EVENT_BUS_NAME_LIST } from '@/utils/eventBusName';
 
 export default {
   name: 'AppContentHeader',
@@ -33,7 +50,7 @@ export default {
   emits: ['check-version'],
   computed: {
     ...mapGetters(['includesDM', 'isDesktop']),
-    ...mapState(['dmGlobalSetting', 'myCatLog', 'mySystemMenuItems', 'sidebarMenu']),
+    ...mapState(['dmGlobalSetting', 'myCatLog', 'mySystemMenuItems', 'sidebarMenu', 'userInfo']),
     showSqlLink() {
       return this.includesDM && this.myCatLog.includes('CAT_DM_CONSOLE') && !this.$route.path.startsWith('/sql');
     },
@@ -214,11 +231,10 @@ export default {
         const isEditMode = this.$route.query.mode === 'edit';
         const dsDisplayName = this.dataSourceDisplayName(dsType);
         const actionLabel = isEditMode ? this.$t('bian-ji') : this.$t('xin-zeng-shu-ju-yuan');
-        const actionTo = isEditMode ? '/datasource' : dsType ? '/datasource/add' : '';
-        const breadcrumbs = [
-          { label: this.$t('nav-shu-ju-ku-guan-li'), to: '/datasource' },
-          { label: actionLabel, to: actionTo }
-        ];
+        const actionBreadcrumb = isEditMode
+          ? { label: actionLabel, to: '/datasource' }
+          : { label: actionLabel, event: EVENT_BUS_NAME_LIST.SHOW_ADD_DATASOURCE_TYPE_MODAL };
+        const breadcrumbs = [{ label: this.$t('nav-shu-ju-ku-guan-li'), to: '/datasource' }, actionBreadcrumb];
         if (dsDisplayName) {
           breadcrumbs.push({ label: isEditMode && instanceId ? `${dsDisplayName}(${instanceId})` : dsDisplayName, to: '' });
         }
@@ -315,24 +331,21 @@ export default {
     }
   },
   methods: {
+    handleGoSql() {
+      saveLastWorkbenchRoute(this.$route, this.userInfo?.uid);
+      this.$router.push({ path: '/sql' }).catch(() => {});
+    },
+    handleBreadcrumbEvent(eventName) {
+      if (!eventName) {
+        return;
+      }
+      this.$bus.emit(eventName);
+    },
     dataSourceDisplayName(dsType) {
       if (!dsType) {
         return '';
       }
-      const supportNames = this.dmGlobalSetting?.dsSupportNames || [];
-      const groups = Array.isArray(supportNames) ? supportNames : [];
-      for (const group of groups) {
-        const items = Array.isArray(group) ? group : [group];
-        for (const item of items) {
-          if (typeof item === 'string' && item === dsType) {
-            return item;
-          }
-          if (item && item.dsKey === dsType) {
-            return item.displayName || item.dsKey;
-          }
-        }
-      }
-      return dsType;
+      return findDsSupportName(dsType, this.dmGlobalSetting?.dsSupportNames)?.displayName || dsType;
     }
   }
 };
@@ -362,6 +375,15 @@ export default {
   &.is-current {
     color: #1f2937;
   }
+}
+
+.app-content-header__crumb-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  appearance: none;
 }
 
 .app-content-header__separator {

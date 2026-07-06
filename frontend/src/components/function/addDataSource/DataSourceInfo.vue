@@ -1,65 +1,91 @@
 <template>
   <div class="add-datasource-step1" :class="{ 'is-form-step': currentStep === 1 }">
-    <Form
-      v-if="currentStep === 0"
-      ref="selectDsTypeForm"
-      :model="addDataSourceForm"
-      label-position="right"
-      :label-width="110"
-      :rules="selectDsTypeRules"
-    >
-      <FormItem class="datasource-type-form-item" prop="type" :label-width="0">
-        <RadioGroup
-          v-model="addDataSourceForm.type"
-          type="button"
-          class="datasource-type-radio-group radio-group-radius-warp-datasource custom-radio-group"
-          @on-change="handleDataSourceChange"
-        >
-          <div class="datasource-type-group" v-for="(dataSourceGroup, index) of dataSourceTypes" :key="index">
-            <Radio translate="no" class="datasource-type-radio custom-radio" v-for="type of dataSourceGroup" :label="type.dsKey" :key="type.dsKey">
-              <span class="datasource-type-card">
-                <DataSourceIcon class="datasource-type-icon" size="30px" :type="type.dsKey" leftMargin="0"></DataSourceIcon>
-                <span class="datasource-type-name" :title="type.displayName">
-                  {{ type.displayName }}
-                </span>
-              </span>
-            </Radio>
+    <section v-if="currentStep === 1" class="add-datasource-card datasource-config-card-panel">
+      <div class="datasource-config-layout">
+        <nav class="datasource-config-menu">
+          <div class="datasource-config-menu-group">
+            <div class="datasource-config-menu-primary">
+              <span class="datasource-config-menu-accent"></span>
+              <span>{{ $t('shu-ju-yuan-pei-zhi-xin-xi') }}</span>
+            </div>
+            <div class="datasource-config-menu-children">
+              <button
+                v-for="panel in visibleAddDsPanels"
+                :key="panel.key"
+                type="button"
+                class="datasource-config-menu-child"
+                :class="{ active: activeAddDsPanelKey === panel.key }"
+                @click="activeAddDsPanelKey = panel.key"
+              >
+                {{ panel.titleI18N || panel.key }}
+              </button>
+            </div>
           </div>
-        </RadioGroup>
-      </FormItem>
-    </Form>
-    <div v-if="currentStep === 1" class="add-datasource-form-stage">
-      <Form ref="addLocalDs" :model="addDataSourceForm" label-position="right" :label-width="160" :rules="addDataSourceRule">
-        <div class="add-ds-name-form">
-          <FormItem prop="instanceDesc" :label="$t('shu-ju-yuan-ming-cheng')">
-            <Input v-model.trim="addDataSourceForm.instanceDesc" class="add-ds-name-input" />
-          </FormItem>
+        </nav>
+
+        <div class="datasource-config-scroll">
+          <Form
+            ref="addLocalDs"
+            class="datasource-config-form"
+            :model="addDataSourceForm"
+            label-position="right"
+            :label-width="160"
+            :rules="addDataSourceRule"
+          >
+            <div v-if="visibleAddDsPanels.length" class="add-ds-ui-panel-preview">
+              <Spin v-if="addDsConfigLoading" fix />
+              <div class="datasource-config-content">
+                <div class="datasource-type-form-row">
+                  <div class="datasource-type-form-label">{{ $t('shu-ju-yuan-lei-xing') }}</div>
+                  <div class="datasource-type-form-control">
+                    <span v-if="currentDataSourceType" class="datasource-type-form-value">
+                      <DataSourceIcon size="20px" :type="currentDataSourceType.dsKey" leftMargin="0"></DataSourceIcon>
+                      <span class="datasource-type-form-name" :title="currentDataSourceType.displayName">
+                        {{ currentDataSourceType.displayName }}
+                      </span>
+                    </span>
+                    <span v-else class="datasource-type-empty">{{ $t('zan-wu-shu-ju') }}</span>
+                    <Button v-if="!editMode" class="datasource-type-switch-btn" size="small" @click="handleShowDataSourceTypeModal">
+                      {{ $t('qie-huan') }}
+                    </Button>
+                  </div>
+                </div>
+                <div
+                  v-for="(panel, panelIndex) in visibleAddDsPanels"
+                  v-show="activeAddDsPanelKey === panel.key"
+                  :key="panel.key"
+                  class="datasource-config-pane"
+                >
+                  <div v-if="panelIndex === 0" class="add-ds-name-form">
+                    <FormItem prop="instanceDesc" :label="$t('shu-ju-yuan-ming-cheng')" required>
+                      <Input v-model.trim="addDataSourceForm.instanceDesc" class="add-ds-name-input" />
+                    </FormItem>
+                  </div>
+                  <ui-form-field
+                    v-for="field in panel.visibleFields"
+                    :key="`${panel.key}-${field.field}`"
+                    :field="field"
+                    :form="addDsUiForm"
+                    :data-source-form="addDataSourceForm"
+                    :driver-family-map="driverFamilyMap"
+                    :env-list="envData"
+                    :cluster-list="queryClusterList"
+                    :current-query-cluster="currentQueryCluster"
+                    :current-step="currentStep"
+                    :show-query-config="showQueryConfig"
+                    :field-error="dynamicFieldErrors[field.field] || ''"
+                    :field-errors="dynamicFieldErrors"
+                    @envChange="handleEnvChange"
+                    @clusterChange="handleChangeQueryCluster"
+                    @update:driverReady="handleAddDsDriverReady"
+                  />
+                </div>
+              </div>
+            </div>
+          </Form>
         </div>
-        <div v-if="visibleAddDsPanels.length" class="add-ds-ui-panel-preview">
-          <Spin v-if="addDsConfigLoading" fix />
-          <Tabs v-model="activeAddDsPanelKey" :animated="false">
-            <TabPane v-for="panel in visibleAddDsPanels" :key="panel.key" :name="panel.key" :label="panel.titleI18N || panel.key">
-              <ui-form-field
-                v-for="field in panel.visibleFields"
-                :key="`${panel.key}-${field.field}`"
-                :field="field"
-                :form="addDsUiForm"
-                :data-source-form="addDataSourceForm"
-                :driver-family-map="driverFamilyMap"
-                :env-list="envData"
-                :cluster-list="queryClusterList"
-                :current-query-cluster="currentQueryCluster"
-                :current-step="currentStep"
-                :show-query-config="showQueryConfig"
-                @envChange="handleEnvChange"
-                @clusterChange="handleChangeQueryCluster"
-                @update:driverReady="handleAddDsDriverReady"
-              />
-            </TabPane>
-          </Tabs>
-        </div>
-      </Form>
-    </div>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -67,6 +93,8 @@
 import { mapState } from 'vuex';
 import DataSourceIcon from '@/components/function/DataSourceIcon';
 import { UiFormField } from '@/components/form';
+import { flattenDsSupportNameGroups, normalizeDsSupportNameGroups } from '@/utils/datasourceSupport';
+import { EVENT_BUS_NAME_LIST } from '@/utils/eventBusName';
 
 const emptyHostList = () => [
   {
@@ -101,7 +129,6 @@ export default {
       type: Boolean,
       default: false
     },
-    setSecuritySetting: Function,
     driverFamilyMap: {
       type: Object,
       default: () => ({})
@@ -131,15 +158,7 @@ export default {
       bindClusters: [],
       currentQueryCluster: {},
       dataSourceTypes: [],
-      selectDsTypeRules: {
-        type: [
-          {
-            required: true,
-            message: this.$t('the-type-cannot-be-empty'),
-            trigger: 'change'
-          }
-        ]
-      },
+      dynamicFieldErrors: {},
       addDataSourceRule: {
         instanceDesc: [
           {
@@ -175,6 +194,22 @@ export default {
   },
   computed: {
     ...mapState(['dmGlobalSetting']),
+    flatDataSourceTypes() {
+      return flattenDsSupportNameGroups(this.dataSourceTypes);
+    },
+    currentDataSourceType() {
+      const currentType = this.addDataSourceForm.type;
+      const matchedType = this.flatDataSourceTypes.find((type) => type.dsKey === currentType);
+      if (matchedType) {
+        return matchedType;
+      }
+      return currentType
+        ? {
+            dsKey: currentType,
+            displayName: currentType
+          }
+        : null;
+    },
     currentDriverFamilies() {
       return this.driverFamilyMap[this.addDataSourceForm.type] || [];
     },
@@ -222,9 +257,11 @@ export default {
     }
   },
   methods: {
-    validateSelectStep(callback) {
-      this.$refs.selectDsTypeForm.validate((valid) => {
-        callback(valid);
+    validateAddDsForm(callback) {
+      this.syncCompositeAddDsFields();
+      this.$refs.addLocalDs.validate((valid) => {
+        const dynamicValid = this.validateDynamicAddDsFields();
+        callback(valid && dynamicValid);
       });
     },
     isDriverReadyForSubmit() {
@@ -232,11 +269,7 @@ export default {
     },
     listDataSourceTypes() {
       const supportNames = this.dmGlobalSetting?.dsSupportNames || [];
-      this.dataSourceTypes = Array.isArray(supportNames)
-        ? supportNames
-            .map((group) => (Array.isArray(group) ? group.map(this.normalizeDsSupportName).filter(Boolean) : []))
-            .filter((group) => group.length > 0)
-        : [];
+      this.dataSourceTypes = normalizeDsSupportNameGroups(supportNames);
 
       if (!this.dataSourceTypes.length) {
         return;
@@ -245,25 +278,16 @@ export default {
       const allTypes = this.dataSourceTypes.flatMap((group) => group.map((type) => type.dsKey));
       if (!allTypes.includes(this.addDataSourceForm.type)) {
         this.addDataSourceForm.type = this.dataSourceTypes[0][0].dsKey;
+        if (this.currentStep === 1) {
+          this.fetchAddDsConfig();
+        }
       }
     },
-    normalizeDsSupportName(type) {
-      if (!type) {
-        return null;
+    handleShowDataSourceTypeModal() {
+      if (this.editMode) {
+        return;
       }
-      if (typeof type === 'string') {
-        return {
-          dsKey: type,
-          displayName: type
-        };
-      }
-      if (!type.dsKey) {
-        return null;
-      }
-      return {
-        dsKey: type.dsKey,
-        displayName: type.displayName || type.dsKey
-      };
+      this.$bus.emit(EVENT_BUS_NAME_LIST.SHOW_ADD_DATASOURCE_TYPE_MODAL);
     },
     async fetchBindInfo() {
       const res = await this.$services.dmDataSourceFetchBindInfo({ data: {} });
@@ -319,8 +343,9 @@ export default {
     },
     clearFieldValidate(field) {
       this.$nextTick(() => {
-        if (this.$refs.addLocalDs) {
-          this.$refs.addLocalDs.clearValidate(field);
+        const addLocalDsRef = Array.isArray(this.$refs.addLocalDs) ? this.$refs.addLocalDs[0] : this.$refs.addLocalDs;
+        if (typeof addLocalDsRef?.clearValidate === 'function') {
+          addLocalDsRef.clearValidate(field);
         }
       });
     },
@@ -351,7 +376,6 @@ export default {
       this.addDsUiForm = {};
       this.currentDriverReady = false;
       this.securitySetting = [];
-      this.setSecuritySetting([]);
 
       Object.assign(this.addDataSourceForm, {
         dbName: '',
@@ -444,7 +468,6 @@ export default {
     initSecurityOptions() {
       const securityOptions = this.resolveAddDsSecurityOptions();
       this.securitySetting = securityOptions;
-      this.setSecuritySetting(securityOptions);
       if (!securityOptions.length) {
         return;
       }
@@ -471,6 +494,8 @@ export default {
         form.dsId = this.currentAddDsConfig.dsId;
       }
       this.addDsUiForm = form;
+      this.dynamicFieldErrors = {};
+      this.syncCompositeAddDsFields();
       this.ensureActiveAddDsPanel();
     },
     collectAddDsFieldDefaults(fields, form) {
@@ -529,6 +554,9 @@ export default {
       });
       return result;
     },
+    visibleAddDsFieldsFlat() {
+      return this.visibleAddDsPanels.flatMap((panel) => panel.visibleFields || []);
+    },
     addDsFieldChildren(field) {
       if (field.type === 'Options' || field.type === 'MultipleOptions') {
         return this.selectedAddDsOptionChildren(field);
@@ -542,8 +570,98 @@ export default {
       const selectedValue = this.addDsUiForm[field.field];
       const selectedValues = Array.isArray(selectedValue) ? selectedValue.map(String) : [String(selectedValue)];
       return (field.options || [])
-        .filter((option) => selectedValues.includes(String(option.value ?? option.securityType)))
+        .filter((option) => selectedValues.includes(String(this.optionValue(option))))
         .flatMap((option) => option.children || []);
+    },
+    optionValue(option) {
+      if (!option || typeof option !== 'object') {
+        return option;
+      }
+      return option.value ?? option.securityType ?? option.defaultValue ?? '';
+    },
+    validateDynamicAddDsFields() {
+      this.syncCompositeAddDsFields();
+      const errors = {};
+      this.visibleAddDsFieldsFlat().forEach((field) => {
+        if (!this.isDynamicFieldRequired(field) || this.skipDynamicFieldValidate(field)) {
+          return;
+        }
+        const message = this.requiredFieldMessage(field);
+        if (field.type === 'NetworkAddress') {
+          this.validateNetworkAddressField(field, errors, message);
+          return;
+        }
+        if (this.isEmptyAddDsFieldValue(this.addDsUiForm[field.field], field)) {
+          errors[field.field] = message;
+        }
+      });
+      this.dynamicFieldErrors = errors;
+      this.switchToFirstDynamicErrorPanel(errors);
+      return Object.keys(errors).length === 0;
+    },
+    switchToFirstDynamicErrorPanel(errors) {
+      const errorFields = Object.keys(errors);
+      if (!errorFields.length) {
+        return;
+      }
+      const errorPanel = this.visibleAddDsPanels.find((panel) => (panel.visibleFields || []).some((field) => errorFields.includes(field.field)));
+      if (errorPanel) {
+        this.activeAddDsPanelKey = errorPanel.key;
+      }
+    },
+    skipDynamicFieldValidate(field) {
+      if (this.editMode && field.type === 'Password' && String(this.addDsUiForm[field.field] || '') === '') {
+        return true;
+      }
+      return field.field === 'securityType' || ['EnvironmentSelect', 'ClusterSelect', 'DriverSelection'].includes(field.type);
+    },
+    isDynamicFieldRequired(field) {
+      return field.require === true || field.required === true || field.valueRequire === true || field.type === 'CertificateInput';
+    },
+    validateNetworkAddressField(field, errors, message) {
+      const addressField = this.findChildField(field, 'address');
+      const portField = this.findChildField(field, 'port');
+      const address = this.addDsUiForm.address || '';
+      const port = this.addDsUiForm.port || '';
+      const host = this.addDsUiForm[field.field] || '';
+      const shouldValidatePort =
+        !!portField ||
+        Object.prototype.hasOwnProperty.call(this.addDsUiForm, 'port') ||
+        Object.prototype.hasOwnProperty.call(this.addDataSourceForm, 'port');
+      let hasError = false;
+      if (addressField && this.isEmptyAddDsFieldValue(address, addressField)) {
+        errors[`${field.field}.address`] = this.requiredFieldMessage(addressField);
+        hasError = true;
+      }
+      if (shouldValidatePort && this.isEmptyAddDsFieldValue(port, portField || field)) {
+        errors[`${field.field}.port`] = this.requiredFieldMessage(portField || field);
+        hasError = true;
+      }
+      if (!addressField && !portField && this.isEmptyAddDsFieldValue(host, field)) {
+        errors[`${field.field}.address`] = message;
+        hasError = true;
+      }
+      if (hasError) {
+        errors[field.field] = message;
+      }
+    },
+    findChildField(field, childName) {
+      return (field.children || []).find((child) => child.field === childName);
+    },
+    isEmptyAddDsFieldValue(value, field) {
+      if (field.type === 'Check') {
+        return value !== true;
+      }
+      if (field.type === 'CertificateInput') {
+        return !value || String(value).trim() === '';
+      }
+      if (Array.isArray(value)) {
+        return value.length === 0;
+      }
+      return value === undefined || value === null || String(value).trim() === '';
+    },
+    requiredFieldMessage(field) {
+      return this.$t('bu-neng-wei-kong');
     },
     isAddDsFieldActive(field) {
       const expr = field.activeExpr;
@@ -565,11 +683,39 @@ export default {
       this.activeAddDsPanelKey = this.visibleAddDsPanels[0]?.key || '';
     },
     syncAddDsUiFormToKvConfigs() {
+      this.syncCompositeAddDsFields();
       this.addDataSourceForm.dsKvConfigs.forEach((config) => {
         if (Object.prototype.hasOwnProperty.call(this.addDsUiForm, config.configName)) {
           config.currentCount = this.addDsUiForm[config.configName];
         }
       });
+    },
+    syncCompositeAddDsFields() {
+      this.visibleAddDsFieldsFlat().forEach((field) => {
+        if (field.type === 'NetworkAddress') {
+          this.syncNetworkAddressField(field);
+        }
+      });
+    },
+    syncNetworkAddressField(field) {
+      const address = this.formValueOrDefault(this.addDsUiForm, 'address', this.addDataSourceForm.address);
+      const port = this.formValueOrDefault(this.addDsUiForm, 'port', this.addDataSourceForm.port);
+      let host = this.formValueOrDefault(this.addDsUiForm, field.field, this.addDataSourceForm.host);
+      if (address) {
+        host = port ? `${address}:${port}` : address;
+      }
+      this.addDsUiForm.address = address;
+      this.addDsUiForm.port = port;
+      this.addDsUiForm[field.field] = host;
+      this.addDataSourceForm.address = address;
+      this.addDataSourceForm.port = port;
+      this.addDataSourceForm.host = host;
+    },
+    formValueOrDefault(form, fieldName, defaultValue) {
+      if (form && Object.prototype.hasOwnProperty.call(form, fieldName)) {
+        return form[fieldName] ?? '';
+      }
+      return defaultValue || '';
     },
     getAddDsConfigMap() {
       const configMap = {};
@@ -636,180 +782,354 @@ export default {
 
 <style lang="less" scoped>
 .add-datasource-step1 {
-  padding: 16px 18px;
-
-  &.is-form-step {
-    padding: 0;
-  }
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
 }
 
-.datasource-type-form-item {
-  margin-bottom: 0;
+.add-datasource-card {
+  background: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+.datasource-config-layout {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: #ffffff;
+}
+
+.datasource-type-empty {
+  display: flex;
+  align-items: center;
+  color: #8b98a8;
+  font-size: 13px;
+}
+
+.datasource-config-card-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  --datasource-form-control-width: 380px;
+  --datasource-form-driver-family-width: 208px;
+  --datasource-form-driver-version-label-width: 52px;
+  --datasource-form-driver-version-width: 96px;
+  --datasource-form-driver-status-width: 84px;
+  --datasource-form-driver-message-width: 160px;
+  --datasource-form-driver-row-width: calc(
+    var(--datasource-form-control-width) + var(--datasource-form-inline-gap) + var(--datasource-form-driver-status-width) +
+      var(--datasource-form-inline-gap) + var(--datasource-form-driver-message-width)
+  );
+  --datasource-form-inline-gap: 12px;
+  --network-address-total-width: var(--datasource-form-control-width);
+  --network-address-port-label-width: 52px;
+  --network-address-port-width: 96px;
+  --network-address-gap: var(--datasource-form-inline-gap);
+}
+
+.datasource-config-scroll {
+  flex: 1 1 auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  border-radius: inherit;
+}
+
+.datasource-config-form {
+  height: 100%;
+  min-height: 0;
+  border-radius: inherit;
+}
+
+.add-datasource-form-stage,
+.datasource-config-card-panel {
+  :deep(.ivu-form-item) {
+    margin-bottom: 0;
+  }
 
   :deep(.ivu-form-item-content) {
-    margin-left: 0 !important;
+    padding-bottom: 18px;
+  }
+
+  :deep(.ivu-form-item-error-tip) {
+    top: 30px;
+    padding-top: 0;
+    color: var(--error-color);
+    font-size: 12px;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+
+  :deep(.ivu-form-item-required .ivu-form-item-label::before),
+  :deep(.ivu-form-item-label::before) {
+    display: none;
+    margin-right: 0;
+    content: '';
+  }
+
+  :deep(.ivu-form-item-required .ivu-form-item-label::before) {
+    display: inline-block !important;
+    margin-right: 4px !important;
+    color: var(--error-color);
+    font-family: SimSun, sans-serif;
+    line-height: 1;
+    content: '*' !important;
+  }
+
+  :deep(.ivu-form-item-required .ivu-input),
+  :deep(.ivu-form-item-required .ivu-select-selection),
+  :deep(.ivu-form-item-required .ivu-btn),
+  :deep(.ivu-form-item-required .ivu-radio-group),
+  :deep(.ivu-form-item-required .ivu-checkbox-inner) {
+    box-shadow: inset 0 -1px 0 var(--error-color);
+  }
+
+  :deep(.ivu-form-item-required .ivu-input:focus),
+  :deep(.ivu-form-item-required .ivu-select-visible .ivu-select-selection) {
+    box-shadow:
+      inset 0 -1px 0 var(--error-color),
+      0 0 0 2px rgba(62, 207, 142, 0.15);
   }
 }
 
-.datasource-type-radio-group {
-  display: block;
-  width: 100%;
-}
+.add-ds-name-form {
+  padding: 0 0 4px;
+  background: #ffffff;
 
-.datasource-type-group {
-  display: flex;
-  width: 100%;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 18px;
-
-  &:last-child {
+  :deep(.ivu-form-item) {
     margin-bottom: 0;
   }
 }
 
-.datasource-type-radio.custom-radio {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 160px;
-  height: 52px;
-  margin: 0 !important;
-  padding: 0;
-  border-radius: 4px !important;
-  line-height: normal;
-  text-align: center;
-  vertical-align: top;
-  white-space: normal;
+.add-ds-name-input {
+  width: var(--datasource-form-control-width);
+  max-width: 100%;
+}
 
-  :deep(.ivu-radio) {
-    display: none;
+.datasource-config-card-panel {
+  :deep(.ui-input-field) {
+    width: var(--datasource-form-control-width) !important;
   }
 
-  :deep(.ivu-radio-inner) {
-    display: none;
+  :deep(.ivu-form-item:not(.driver-selection-form-item) > .ivu-form-item-content > .ivu-select),
+  :deep(.cluster-select-field),
+  :deep(.cluster-select-field > .ivu-select) {
+    width: var(--datasource-form-control-width) !important;
+  }
+
+  :deep(.driver-selection-field),
+  :deep(.driver-selection-row) {
+    width: var(--datasource-form-driver-row-width) !important;
+  }
+
+  :deep(.driver-selection-row) {
+    display: grid;
+    grid-template-columns:
+      var(--datasource-form-driver-family-width)
+      var(--datasource-form-driver-version-label-width)
+      var(--datasource-form-driver-version-width)
+      var(--datasource-form-driver-status-width)
+      minmax(0, var(--datasource-form-driver-message-width));
+    column-gap: var(--datasource-form-inline-gap);
+    align-items: center;
+  }
+
+  :deep(.driver-family-select) {
+    width: var(--datasource-form-driver-family-width) !important;
+    flex: 0 0 var(--datasource-form-driver-family-width);
+  }
+
+  :deep(.driver-version-label) {
+    width: var(--datasource-form-driver-version-label-width) !important;
+    flex: 0 0 var(--datasource-form-driver-version-label-width);
+    justify-content: flex-end;
+  }
+
+  :deep(.driver-version-select) {
+    width: var(--datasource-form-driver-version-width) !important;
+    flex: 0 0 var(--datasource-form-driver-version-width);
+  }
+
+  :deep(.driver-status-detail) {
+    grid-column: 5;
+    max-width: var(--datasource-form-driver-message-width);
   }
 }
 
 .add-ds-ui-panel-preview {
   position: relative;
+  display: flex;
+  height: 100%;
+  min-height: 0;
   margin-top: 0;
-  background: var(--bg-card);
+  background: #ffffff;
+  border-radius: inherit;
+}
 
-  :deep(.ivu-tabs-bar) {
-    height: 54px;
-    margin-bottom: 0;
-    padding: 0 24px;
-    border-bottom: 1px solid var(--border-primary);
-    background: var(--bg-secondary);
-  }
+.datasource-config-menu {
+  display: flex;
+  align-self: stretch;
+  flex: 0 0 188px;
+  flex-direction: column;
+  width: 188px;
+  min-height: 100%;
+  gap: 18px;
+  padding: 20px 12px;
+  background: #ffffff;
+  border-right: 1px solid var(--border-light);
+}
 
-  :deep(.ivu-tabs-nav-container),
-  :deep(.ivu-tabs-nav-wrap),
-  :deep(.ivu-tabs-nav-scroll),
-  :deep(.ivu-tabs-nav) {
-    height: 54px;
-  }
+.datasource-config-menu-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
 
-  :deep(.ivu-tabs-bar .ivu-tabs-tab) {
-    display: inline-flex !important;
-    height: 54px;
-    align-items: center;
-    justify-content: center;
-    margin-right: 6px;
-    padding: 0 24px !important;
-    border: none !important;
-    border-radius: 0;
-    background: transparent !important;
-    color: var(--text-secondary) !important;
-    font-size: 14px;
-    line-height: normal !important;
-  }
+.datasource-config-menu-primary {
+  display: flex;
+  height: 40px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 0 10px;
+  color: #1f2937;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
 
-  :deep(.ivu-tabs-bar .ivu-tabs-tab-active) {
-    position: relative;
-    background: transparent !important;
-    color: var(--primary-color) !important;
+.datasource-config-menu-accent {
+  display: inline-block;
+  width: 4px;
+  height: 24px;
+  flex: 0 0 4px;
+  border-radius: 999px;
+  background: #21bf73;
+}
+
+.datasource-config-menu-children {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.datasource-config-menu-child {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 38px;
+  align-items: center;
+  border: none;
+  border-radius: 6px;
+  padding: 0 14px 0 30px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: normal;
+  text-align: left;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease;
+
+  &.active {
+    background: #effbf5;
+    color: var(--text-primary);
     font-weight: 500;
 
     &::after {
       position: absolute;
-      right: 18px;
-      bottom: 0;
-      left: 18px;
-      height: 2px;
+      top: 8px;
+      bottom: 8px;
+      left: 14px;
+      width: 3px;
+      border-radius: 999px;
       background: var(--primary-color);
       content: '';
     }
   }
-
-  :deep(.ivu-tabs-ink-bar) {
-    display: none !important;
-  }
-
-  :deep(.ivu-tabs-content) {
-    overflow: visible;
-    padding: 28px 32px 36px;
-  }
-
-  :deep(.ivu-tabs-tabpane) {
-    overflow: visible;
-  }
 }
 
-.add-ds-name-form {
-  padding: 28px 32px 0;
-  background: var(--bg-card);
-
-  :deep(.ivu-form-item) {
-    margin-bottom: 26px;
-  }
-}
-
-.add-ds-name-input {
-  width: 462px;
-  max-width: 100%;
-}
-
-.datasource-type-card {
-  display: flex;
-  width: 100%;
+.datasource-config-content {
+  flex: 1 1 auto;
   height: 100%;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  text-align: left;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: visible;
+  padding: 18px 32px 18px;
 }
 
-.datasource-type-icon {
+.datasource-type-form-row {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  align-items: center;
+  min-height: 36px;
+  margin-bottom: 12px;
+}
+
+.datasource-type-form-label {
+  padding: 7px 12px 7px 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 22px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.datasource-type-form-control {
   display: flex;
-  width: 34px;
-  flex: 0 0 34px;
+  min-width: 0;
   align-items: center;
-  justify-content: center;
-  height: 34px;
-  line-height: 1;
-
-  :deep(> div) {
-    display: inline-flex !important;
-    width: 34px;
-    height: 34px;
-    align-items: center;
-    justify-content: center;
-  }
+  gap: 12px;
 }
 
-.datasource-type-name {
-  display: -webkit-box;
-  flex: 1;
+.datasource-type-form-value {
+  display: inline-flex;
+  max-width: var(--datasource-form-control-width);
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+}
+
+.datasource-type-form-name {
   min-width: 0;
   overflow: hidden;
-  color: #17233d;
-  font-size: 14px;
-  line-height: 18px;
-  white-space: normal;
-  word-break: break-word;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.datasource-type-switch-btn {
+  flex: 0 0 auto;
+  height: 30px;
+  padding: 0 12px;
+}
+
+.datasource-config-pane {
+  overflow: visible;
+}
+
+@media (max-width: 768px) {
+  .datasource-config-menu {
+    flex-basis: 164px;
+    width: 164px;
+  }
+
+  .datasource-config-content {
+    padding: 20px 20px 32px;
+  }
 }
 </style>

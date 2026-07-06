@@ -53,6 +53,7 @@ public class JdbcSqlServerDsFactory implements DsFactory<Connection> {
         String clientEncoding = dsConfig.getProperty(DsConfigKeys.CLIENT_ENCODING.getConfigKey());
         String tcpKeepAlive = dsConfig.getProperty(DsConfigKeys.TCP_KEEP_ALIVE.getConfigKey());
         String autoCommit = dsConfig.getProperty(DsConfigKeys.AUTO_COMMIT.getConfigKey());
+        String trustServerCertificate = dsConfig.getProperty(DsConfigKeys.MSSQL_TRUST_SERVER_CERTIFICATE.getConfigKey());
 
         if (StringUtils.isNotBlank(username)) {
             props.put("user", username);
@@ -73,6 +74,12 @@ public class JdbcSqlServerDsFactory implements DsFactory<Connection> {
         }
 
         String jdbcUrl = buildJdbcUrl(dsConfig);
+        if (StringUtils.isNotBlank(trustServerCertificate)) {
+            props.put(DsConfigKeys.MSSQL_TRUST_SERVER_CERTIFICATE.getConfigKey(), trustServerCertificate);
+        } else if (!StringUtils.containsIgnoreCase(jdbcUrl,
+            ";" + DsConfigKeys.MSSQL_TRUST_SERVER_CERTIFICATE.getConfigKey() + "=")) {
+            props.put(DsConfigKeys.MSSQL_TRUST_SERVER_CERTIFICATE.getConfigKey(), "true");
+        }
         try {
             Connection msConnect = createConnection(jdbcUrl, props);
 

@@ -54,17 +54,40 @@
             </Button>
           </div>
           <div class="role-auth-tree-container">
-            <a-tree
-              v-if="displayTreeData.length"
-              v-model:checkedKeys="checkedKeys"
-              :tree-data="displayTreeData"
-              checkable
-              :selectable="false"
-              :disabled="!canEditAuth"
-              :replace-fields="replaceFields"
-              v-model:expandedKeys="expandedKeys"
-              @check="handleAuthCheckedChange"
-            ></a-tree>
+            <div v-if="displayTreeData.length" class="role-auth-tree-shell">
+              <aside ref="authIndexScroll" class="role-auth-index">
+                <div class="role-auth-index-list">
+                  <button
+                    v-for="item in authIndexItems"
+                    :key="item.key"
+                    type="button"
+                    class="role-auth-index-item"
+                    :class="{ active: activeAuthIndexKey === item.key }"
+                    :data-auth-key="item.key"
+                    @click="handleAuthIndexClick(item.key)"
+                  >
+                    {{ item.title }}
+                  </button>
+                </div>
+              </aside>
+              <div ref="authTreeScroll" class="role-auth-tree-scroll" @scroll.passive="handleAuthTreeScroll">
+                <a-tree
+                  class="role-auth-tree"
+                  :checked-keys="checkedKeys"
+                  :tree-data="displayTreeData"
+                  checkable
+                  :selectable="false"
+                  :disabled="!canEditAuth"
+                  :replace-fields="replaceFields"
+                  v-model:expandedKeys="expandedKeys"
+                  @check="handleAuthCheckedChange"
+                >
+                  <template #title="{ i18nName, title, key }">
+                    <span class="role-auth-tree-node-title" :data-auth-key="key">{{ i18nName || title }}</span>
+                  </template>
+                </a-tree>
+              </div>
+            </div>
             <div v-else class="role-auth-empty">{{ $t('zan-wu-shu-ju') }}</div>
           </div>
         </div>
@@ -90,12 +113,17 @@ export default {
       },
       checkedKeys: [],
       expandedKeys: [],
+      authFilterExpandedKeys: [],
+      authFilterActive: false,
       authSearchText: '',
       onlyShowSelected: false,
+      activeAuthIndexKey: '',
+      authTreeScrollRaf: null,
       treeData: [],
       allAuthKeys: [],
       categoryKeys: [],
-      mustCheckedKeys: []
+      mustCheckedKeys: [],
+      authIncludeMap: {}
     };
   },
   computed: {
@@ -127,10 +155,23 @@ export default {
     },
     displayTreeData() {
       return this.getDisplayTreeData();
+    },
+    authIndexItems() {
+      const rootChildren = this.displayTreeData[0]?.children || [];
+      return rootChildren.map((node) => ({
+        key: node.key,
+        title: node.i18nName || node.title || node.key
+      }));
     }
   },
   mounted() {
     this.init();
+  },
+  beforeUnmount() {
+    if (this.authTreeScrollRaf) {
+      window.cancelAnimationFrame(this.authTreeScrollRaf);
+      this.authTreeScrollRaf = null;
+    }
   },
   methods: {
     async init() {
@@ -156,7 +197,9 @@ export default {
         roleName: res.data.aliasName || res.data.roleName,
         innerTag: res.data.innerTag
       };
-      this.checkedKeys = [...(res.data.roleLabels || [])];
+      this.checkedKeys = Array.isArray(res.data.selectedRoleLabels)
+        ? [...res.data.selectedRoleLabels]
+        : this.compactAuthKeys(res.data.roleLabels || []);
     },
     async getAllAuthLabel() {
       const res = await this.$services.rdpRoleListRoleAuthLabelTree();
@@ -164,6 +207,7 @@ export default {
       const categoryKeys = [];
       const mustCheckedKeys = [];
       const expandableKeys = [];
+      const authIncludeMap = {};
       const treeData = [
         {
           children: [],
@@ -181,6 +225,8 @@ export default {
         allAuthKeys.push(node.key);
         if (node.category) {
           categoryKeys.push(node.key);
+        } else {
+          authIncludeMap[node.key] = Array.isArray(node.include) ? node.include.filter(Boolean) : [];
         }
         node.title = node.i18nName;
         if (node.mustSelectAndReadOnly) {
@@ -198,8 +244,42 @@ export default {
       this.allAuthKeys = allAuthKeys;
       this.categoryKeys = categoryKeys;
       this.mustCheckedKeys = [...mustCheckedKeys];
+      this.authIncludeMap = authIncludeMap;
       this.expandedKeys = expandableKeys;
       this.checkedKeys = [...mustCheckedKeys];
+      this.activeAuthIndexKey = treeData[0].children[0]?.key || '';
+      this.$nextTick(() => this.syncAuthIndexWithScroll());
+    },
+    getCascadeIncludeKeys(key, seen = new Set()) {
+      if (!key || seen.has(key)) {
+        return [];
+      }
+      seen.add(key);
+      const includes = this.authIncludeMap[key] || [];
+      return includes.reduce((result, includeKey) => {
+        result.push(includeKey);
+        result.push(...this.getCascadeIncludeKeys(includeKey, seen));
+        return result;
+      }, []);
+    },
+    compactAuthKeys(keys = []) {
+      const sourceKeys = Array.from(new Set(keys || []));
+      const sourceKeySet = new Set(sourceKeys);
+      const includedKeySet = new Set();
+      sourceKeys.forEach((key) => {
+        this.getCascadeIncludeKeys(key).forEach((includeKey) => {
+          if (sourceKeySet.has(includeKey) && !this.mustCheckedKeys.includes(includeKey)) {
+            includedKeySet.add(includeKey);
+          }
+        });
+      });
+      return sourceKeys.filter((key) => !includedKeySet.has(key));
+    },
+    isAuthKey(key) {
+      return key && key !== 'ALL' && !this.categoryKeys.includes(key);
+    },
+    normalizeCheckedAuthKeys(keys = []) {
+      return Array.from(new Set([...(keys || []).filter((key) => this.isAuthKey(key)), ...this.mustCheckedKeys]));
     },
     getDisplayTreeData() {
       const keyword = (this.authSearchText || '').trim().toLowerCase();
@@ -232,14 +312,152 @@ export default {
       collect(data);
       return keys;
     },
-    handleAuthFilterChange() {
-      this.$nextTick(() => {
-        if (this.authSearchText || this.onlyShowSelected) {
-          this.expandedKeys = this.getExpandableKeys(this.displayTreeData);
+    getTreeAuthKeys(data = this.treeData) {
+      const keys = [];
+      const collect = (nodes = []) => {
+        nodes.forEach((node) => {
+          if (!node.category && node.key !== 'ALL') {
+            keys.push(node.key);
+          }
+          if (node.children && node.children.length) {
+            collect(node.children);
+          }
+        });
+      };
+      collect(data);
+      return keys;
+    },
+    getAuthAncestorKeys(targetKey, data = this.treeData) {
+      const findNode = (nodes = [], parents = []) => {
+        for (const node of nodes) {
+          if (node.key === targetKey) {
+            return parents;
+          }
+          const childResult = findNode(node.children || [], [...parents, node.key]);
+          if (childResult) {
+            return childResult;
+          }
         }
+        return null;
+      };
+      return findNode(data) || [];
+    },
+    getAuthTreeTitleNode(key) {
+      const scrollEl = this.$refs.authTreeScroll;
+      return Array.from(scrollEl?.querySelectorAll?.('.role-auth-tree-node-title') || []).find((node) => node.dataset.authKey === key);
+    },
+    getAuthIndexNode(key) {
+      const indexEl = this.$refs.authIndexScroll;
+      return Array.from(indexEl?.querySelectorAll?.('.role-auth-index-item') || []).find((node) => node.dataset.authKey === key);
+    },
+    scrollAuthIndexIntoView(key) {
+      const indexEl = this.$refs.authIndexScroll;
+      const target = this.getAuthIndexNode(key);
+      if (!indexEl || !target) {
+        return;
+      }
+      const indexRect = indexEl.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      if (targetRect.top >= indexRect.top && targetRect.bottom <= indexRect.bottom) {
+        return;
+      }
+      indexEl.scrollTo({
+        top: indexEl.scrollTop + targetRect.top - indexRect.top - indexRect.height / 2 + targetRect.height / 2,
+        behavior: 'smooth'
       });
     },
-    handleAuthCheckedChange() {
+    setActiveAuthIndexKey(key) {
+      if (!key) {
+        return;
+      }
+      if (key !== this.activeAuthIndexKey) {
+        this.activeAuthIndexKey = key;
+      }
+      this.scrollAuthIndexIntoView(key);
+    },
+    syncAuthIndexWithScroll() {
+      const scrollEl = this.$refs.authTreeScroll;
+      if (!scrollEl || !this.authIndexItems.length) {
+        this.activeAuthIndexKey = '';
+        return;
+      }
+      const scrollRect = scrollEl.getBoundingClientRect();
+      const anchorTop = scrollRect.top + 16;
+      let activeKey = this.authIndexItems[0].key;
+
+      this.authIndexItems.forEach((item) => {
+        const titleNode = this.getAuthTreeTitleNode(item.key);
+        if (!titleNode) {
+          return;
+        }
+        if (titleNode.getBoundingClientRect().top <= anchorTop) {
+          activeKey = item.key;
+        }
+      });
+
+      this.setActiveAuthIndexKey(activeKey);
+    },
+    handleAuthTreeScroll() {
+      if (this.authTreeScrollRaf) {
+        return;
+      }
+      this.authTreeScrollRaf = window.requestAnimationFrame(() => {
+        this.authTreeScrollRaf = null;
+        this.syncAuthIndexWithScroll();
+      });
+    },
+    handleAuthIndexClick(key) {
+      if (!key) {
+        return;
+      }
+      this.setActiveAuthIndexKey(key);
+      this.expandedKeys = Array.from(new Set([...this.expandedKeys, ...this.getAuthAncestorKeys(key), key]));
+      this.$nextTick(() => {
+        const scrollEl = this.$refs.authTreeScroll;
+        const target = this.getAuthTreeTitleNode(key);
+        if (!scrollEl || !target) {
+          return;
+        }
+        const top = target.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop - 12;
+        scrollEl.scrollTo({
+          top: Math.max(top, 0),
+          behavior: 'smooth'
+        });
+        this.handleAuthTreeScroll();
+      });
+    },
+    isAuthFilterActive() {
+      return Boolean((this.authSearchText || '').trim() || this.onlyShowSelected);
+    },
+    handleAuthFilterChange() {
+      this.$nextTick(() => {
+        if (this.isAuthFilterActive()) {
+          if (!this.authFilterActive) {
+            this.authFilterExpandedKeys = [...this.expandedKeys];
+          }
+          this.authFilterActive = true;
+          this.expandedKeys = this.getExpandableKeys(this.displayTreeData);
+          this.$nextTick(() => this.syncAuthIndexWithScroll());
+          return;
+        }
+
+        this.authFilterActive = false;
+        const defaultExpandedKeys = this.getExpandableKeys(this.treeData);
+        this.expandedKeys = this.authFilterExpandedKeys.length ? [...this.authFilterExpandedKeys] : defaultExpandedKeys;
+        this.authFilterExpandedKeys = [];
+        this.$nextTick(() => this.syncAuthIndexWithScroll());
+      });
+    },
+    handleAuthCheckedChange(checkedKeys) {
+      const emittedCheckedKeys = this.normalizeCheckedAuthKeys(Array.isArray(checkedKeys) ? checkedKeys : checkedKeys?.checked || []);
+      if (!this.isAuthFilterActive()) {
+        this.checkedKeys = emittedCheckedKeys;
+      } else {
+        const visibleAuthKeySet = new Set(this.getTreeAuthKeys(this.displayTreeData));
+        const hiddenCheckedKeys = this.normalizeCheckedAuthKeys(this.checkedKeys).filter((key) => !visibleAuthKeySet.has(key));
+        const visibleCheckedKeys = emittedCheckedKeys.filter((key) => visibleAuthKeySet.has(key));
+        this.checkedKeys = this.normalizeCheckedAuthKeys([...hiddenCheckedKeys, ...visibleCheckedKeys]);
+      }
       if (this.onlyShowSelected) {
         this.handleAuthFilterChange();
       }
@@ -254,7 +472,11 @@ export default {
       if (!this.canEditAuth) {
         return;
       }
-      this.checkedKeys = [...this.allAuthKeys];
+      const sourceTree = this.isAuthFilterActive() ? this.displayTreeData : this.treeData;
+      const sourceAuthKeys = this.getTreeAuthKeys(sourceTree);
+      this.checkedKeys = this.isAuthFilterActive()
+        ? this.normalizeCheckedAuthKeys([...this.checkedKeys, ...sourceAuthKeys])
+        : this.normalizeCheckedAuthKeys(sourceAuthKeys);
       this.handleAuthFilterChange();
     },
     handleClearAuth() {
@@ -274,7 +496,7 @@ export default {
           return;
         }
 
-        const authLabelList = this.checkedKeys.filter((key) => !this.categoryKeys.includes(key) && key !== 'ALL');
+        const authLabelList = this.normalizeCheckedAuthKeys(this.checkedKeys);
         const data = {
           roleName: this.roleForm.roleName,
           authLabelList
@@ -455,11 +677,78 @@ export default {
 .role-auth-tree-container {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
-  padding: 18px 22px;
+  overflow: hidden;
+  padding: 0;
   border: 1px solid #e5e8ef;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.role-auth-tree-shell {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: 184px minmax(0, 1fr);
+}
+
+.role-auth-index {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 12px;
+  border-right: 1px solid #edf0f5;
+  background: #ffffff;
+}
+
+.role-auth-index-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.role-auth-index-item {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 8px 7px 14px;
+  background: transparent;
+  color: #4b5565;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 18px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease;
+  white-space: nowrap;
+
+  &:hover,
+  &.active {
+    background: #effbf5;
+    color: #17233d;
+  }
+
+  &.active::before {
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: 5px;
+    width: 3px;
+    border-radius: 999px;
+    background: #21bf73;
+    content: '';
+  }
+}
+
+.role-auth-tree-scroll {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 22px 18px 34px;
 }
 
 .role-auth-empty {
@@ -478,6 +767,36 @@ export default {
 
 :deep(.ant-tree li) {
   padding: 2px 0;
+}
+
+:deep(.role-auth-tree .ant-tree-child-tree) {
+  position: relative;
+  margin-left: 11px;
+  padding-left: 16px;
+}
+
+:deep(.role-auth-tree .ant-tree-child-tree::before) {
+  position: absolute;
+  top: 0;
+  bottom: 14px;
+  left: 0;
+  width: 1px;
+  background: #dfe6ef;
+  content: '';
+}
+
+:deep(.role-auth-tree .ant-tree-child-tree > li) {
+  position: relative;
+}
+
+:deep(.role-auth-tree .ant-tree-child-tree > li::before) {
+  position: absolute;
+  top: 16px;
+  left: -16px;
+  width: 13px;
+  height: 1px;
+  background: #dfe6ef;
+  content: '';
 }
 
 :deep(.ant-tree li .ant-tree-node-content-wrapper) {

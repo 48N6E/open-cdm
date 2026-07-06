@@ -1,8 +1,14 @@
 <template>
-  <FormItem v-if="field.type === 'EnvironmentSelect'" :label="fieldLabel" :required="field.require" prop="envId">
+  <FormItem v-if="field.type === 'EnvironmentSelect'" :label="fieldLabel" :required="fieldRequired" prop="envId" :error="fieldError">
     <environment-select-field :model-value="dataSourceForm.envId" :env-list="envList" @change="updateEnvironment" />
   </FormItem>
-  <FormItem v-else-if="field.type === 'ClusterSelect' && showQueryConfig" :label="fieldLabel" :required="field.require" prop="queryClusterId">
+  <FormItem
+    v-else-if="field.type === 'ClusterSelect' && showQueryConfig"
+    :label="fieldLabel"
+    :required="fieldRequired"
+    prop="queryClusterId"
+    :error="fieldError"
+  >
     <cluster-select-field
       :model-value="dataSourceForm.queryClusterId"
       :cluster-list="clusterList"
@@ -10,7 +16,12 @@
       @change="updateCluster"
     />
   </FormItem>
-  <FormItem v-else-if="field.type === 'DriverSelection' && hasDriverFamilies" class="driver-selection-form-item" :label="fieldLabel">
+  <FormItem
+    v-else-if="field.type === 'DriverSelection' && hasDriverFamilies"
+    class="driver-selection-form-item"
+    :label="fieldLabel"
+    :required="fieldRequired"
+  >
     <driver-selection-field
       :data-source-type="dataSourceForm.type"
       :driver-family-map="driverFamilyMap"
@@ -26,45 +37,52 @@
       @update:driverReady="$emit('update:driverReady', $event)"
     />
   </FormItem>
-  <FormItem v-else-if="field.type === 'NetworkAddress'" :label="fieldLabel" :required="field.require">
+  <FormItem v-else-if="field.type === 'NetworkAddress'" :label="fieldLabel" :required="fieldRequired" :error="''">
     <network-address-field
       :model-value="networkAddressValue"
       :field="field"
+      :required="fieldRequired"
       :disabled="isFieldDisabled(field)"
       :address-resolver="addressResolver"
       :resolver-context="dataSourceForm"
+      :errors="networkAddressErrors"
       @update:modelValue="updateNetworkAddress"
     />
     <span v-if="field.descI18N" class="ui-form-field-desc" v-html="field.descI18N"></span>
   </FormItem>
-  <FormItem v-else-if="field.type === 'MaxComputeEndpoint'" :label="fieldLabel" :required="field.require">
+  <FormItem v-else-if="field.type === 'MaxComputeEndpoint'" :label="fieldLabel" :required="fieldRequired" :error="fieldError">
     <max-compute-endpoint-field :field="field" :form="form" :data-source-form="dataSourceForm" :disabled="isFieldDisabled(field)" />
     <span v-if="field.descI18N" class="ui-form-field-desc" v-html="field.descI18N"></span>
   </FormItem>
-  <FormItem v-else-if="field.type === 'Options' || field.type === 'MultipleOptions'" :label="fieldLabel" :required="field.require">
+  <FormItem
+    v-else-if="field.type === 'Options' || field.type === 'MultipleOptions'"
+    :label="fieldLabel"
+    :required="fieldRequired"
+    :error="fieldError"
+  >
     <options-field :field="field" :form="form" :disabled="isFieldDisabled(field)" />
     <span v-if="field.descI18N" class="ui-form-field-desc" v-html="field.descI18N"></span>
   </FormItem>
-  <FormItem v-else-if="field.type === 'TransactionControl'" :label="fieldLabel" :required="field.require">
+  <FormItem v-else-if="field.type === 'TransactionControl'" :label="fieldLabel" :required="fieldRequired" :error="fieldError">
     <transaction-control-field :field="field" :form="form" :disabled="isFieldDisabled(field)" />
     <span v-if="field.descI18N" class="ui-form-field-desc" v-html="field.descI18N"></span>
   </FormItem>
-  <FormItem v-else-if="field.type === 'SshTunnel'" :label="fieldLabel" :required="field.require">
+  <FormItem v-else-if="field.type === 'SshTunnel'" :label="fieldLabel" :required="fieldRequired" :error="fieldError">
     <ssh-tunnel-field :field="field" :form="form" :cluster-id="dataSourceForm.queryClusterId" :disabled="isFieldDisabled(field)" />
     <span v-if="field.descI18N" class="ui-form-field-desc" v-html="field.descI18N"></span>
   </FormItem>
-  <FormItem v-else-if="field.type === 'CertificateInput'" :label="fieldLabel" :required="field.require">
+  <FormItem v-else-if="field.type === 'CertificateInput'" :label="fieldLabel" :required="fieldRequired" :error="fieldError">
     <certificate-input-field :field="field" :form="form" :disabled="isFieldDisabled(field)" />
     <span v-if="field.descI18N" class="ui-form-field-desc" v-html="field.descI18N"></span>
   </FormItem>
-  <FormItem v-else-if="field.type === 'Check'" :label="fieldLabel" :required="field.require">
+  <FormItem v-else-if="field.type === 'Check'" :label="fieldLabel" :required="fieldRequired" :error="fieldError">
     <check-field :field="field" :form="form" :disabled="isFieldDisabled(field)" />
   </FormItem>
-  <FormItem v-else-if="field.type === 'TextArea'" :label="fieldLabel" :required="field.require">
+  <FormItem v-else-if="field.type === 'TextArea'" :label="fieldLabel" :required="fieldRequired" :error="fieldError">
     <text-area-field :field="field" :form="form" :disabled="isFieldDisabled(field)" />
     <span v-if="field.descI18N" class="ui-form-field-desc" v-html="field.descI18N"></span>
   </FormItem>
-  <FormItem v-else-if="field.type === 'Input' || field.type === 'Password'" :label="fieldLabel" :required="field.require">
+  <FormItem v-else-if="field.type === 'Input' || field.type === 'Password'" :label="fieldLabel" :required="fieldRequired" :error="fieldError">
     <input-field :field="field" :form="form" :disabled="isFieldDisabled(field)" />
     <span v-if="field.descI18N" class="ui-form-field-desc" v-html="field.descI18N"></span>
   </FormItem>
@@ -108,6 +126,14 @@ export default {
       type: Object,
       required: true
     },
+    fieldError: {
+      type: String,
+      default: ''
+    },
+    fieldErrors: {
+      type: Object,
+      default: () => ({})
+    },
     dataSourceForm: {
       type: Object,
       required: true
@@ -143,7 +169,16 @@ export default {
   },
   computed: {
     fieldLabel() {
-      return this.field.titleI18N || this.field.field;
+      const label = this.field.titleI18N || this.field.field;
+      const labelMap = {
+        '启用 Schema': '指定 Schema',
+        启用Schema: '指定 Schema',
+        'Enable Schema': 'Specify Schema'
+      };
+      return labelMap[label] || label;
+    },
+    fieldRequired() {
+      return this.isRequiredField(this.field) || (this.field.type === 'NetworkAddress' && (this.field.children || []).some(this.isRequiredField));
     },
     hasDriverFamilies() {
       return !!(this.driverFamilyMap[this.dataSourceForm.type] || []).length;
@@ -152,13 +187,22 @@ export default {
       const value = this.dataSourceForm.hostList?.[0] || {};
       return {
         ...value,
-        host: this.form.address || value.host || this.form[this.field.field] || '',
-        port: this.form.port || value.port || ''
+        host: this.formValueOrDefault('address', value.host ?? this.form[this.field.field] ?? ''),
+        port: this.formValueOrDefault('port', value.port ?? '')
+      };
+    },
+    networkAddressErrors() {
+      return {
+        address: this.fieldErrors[`${this.field.field}.address`] || this.fieldError || '',
+        port: this.fieldErrors[`${this.field.field}.port`] || ''
       };
     }
   },
   emits: ['update:driverReady', 'envChange', 'clusterChange'],
   methods: {
+    isRequiredField(field) {
+      return field?.require === true || field?.required === true || field?.valueRequire === true || field?.type === 'CertificateInput';
+    },
     isFieldDisabled(field) {
       return field.readOnly || field.addReadOnly;
     },
@@ -175,6 +219,12 @@ export default {
     },
     updateDriverVersion(value) {
       this.form.driverVersion = value || '';
+    },
+    formValueOrDefault(fieldName, defaultValue) {
+      if (Object.prototype.hasOwnProperty.call(this.form, fieldName)) {
+        return this.form[fieldName] ?? '';
+      }
+      return defaultValue || '';
     },
     updateNetworkAddress(value) {
       const hostList = Array.isArray(this.dataSourceForm.hostList) ? [...this.dataSourceForm.hostList] : [];

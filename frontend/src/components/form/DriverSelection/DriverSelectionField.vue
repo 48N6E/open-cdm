@@ -1,12 +1,13 @@
 <template>
   <div class="driver-selection-field">
     <div class="driver-selection-row">
-      <Select v-model="innerDriverFamily" style="width: 180px" transfer @on-change="handleDriverFamilyChange">
+      <Select class="driver-family-select" v-model="innerDriverFamily" style="width: 180px" transfer @on-change="handleDriverFamilyChange">
         <Option v-for="family in currentDriverFamilies" :key="family.name" :value="family.name">
           {{ family.name }}
         </Option>
       </Select>
-      <Select v-model="innerDriverVersion" style="width: 126px" transfer @on-change="handleDriverVersionChange">
+      <span class="driver-version-label">{{ $t('ban-ben') }}</span>
+      <Select class="driver-version-select" v-model="innerDriverVersion" style="width: 126px" transfer @on-change="handleDriverVersionChange">
         <Option v-for="version in currentDriverVersions" :key="version" :value="version">
           {{ version }}
         </Option>
@@ -17,22 +18,22 @@
       <span v-if="showDriverReadyState" class="driver-status-icon-wrap">
         <Icon type="md-checkmark-circle" class="driver-status-ready-icon" />
       </span>
-    </div>
-    <div v-if="showDriverStatusDetail" class="driver-status-detail" :class="driverStatusLineClass">
-      <span class="driver-status-icon-wrap" :class="{ 'is-clickable': canClickDriverStatusIcon }" @click="handleDriverStatusIconClick">
-        <span v-if="showDriverDownloadProgress" class="driver-status-progress-circle" :style="driverProgressCircleStyle">
-          <span class="driver-status-progress-circle-text">{{ driverProgressCircleText }}</span>
+      <div v-if="showDriverStatusDetail" class="driver-status-detail" :class="driverStatusLineClass">
+        <span class="driver-status-icon-wrap" :class="{ 'is-clickable': canClickDriverStatusIcon }" @click="handleDriverStatusIconClick">
+          <span v-if="showDriverDownloadProgress" class="driver-status-progress-circle" :style="driverProgressCircleStyle">
+            <span class="driver-status-progress-circle-text">{{ driverProgressCircleText }}</span>
+          </span>
+          <Icon v-else-if="driverUiState === 'checking'" type="ios-loading" class="driver-status-loading-icon" />
+          <Icon v-else-if="driverUiState === 'ready'" type="md-checkmark-circle" class="driver-status-ready-icon" />
+          <Icon v-else-if="driverUiState === 'unknown'" type="ios-help-circle-outline" class="driver-status-unknown-icon" />
+          <Icon v-else-if="driverUiState === 'unprepared'" type="ios-warning-outline" class="driver-status-warning-icon" />
+          <Icon v-else-if="driverUiState === 'error'" type="ios-alert-circle" class="driver-status-error-icon" />
+          <span v-else class="driver-status-phase-dot"></span>
         </span>
-        <Icon v-else-if="driverUiState === 'checking'" type="ios-loading" class="driver-status-loading-icon" />
-        <Icon v-else-if="driverUiState === 'ready'" type="md-checkmark-circle" class="driver-status-ready-icon" />
-        <Icon v-else-if="driverUiState === 'unknown'" type="ios-help-circle-outline" class="driver-status-unknown-icon" />
-        <Icon v-else-if="driverUiState === 'unprepared'" type="ios-warning-outline" class="driver-status-warning-icon" />
-        <Icon v-else-if="driverUiState === 'error'" type="ios-alert-circle" class="driver-status-error-icon" />
-        <span v-else class="driver-status-phase-dot"></span>
-      </span>
-      <span v-if="showDriverStatusMessage" class="driver-status-inline-message" :title="driverStatusInlineMessageText">
-        {{ driverStatusInlineMessageText }}
-      </span>
+        <span v-if="showDriverStatusMessage" class="driver-status-inline-message" :title="driverStatusInlineMessageText">
+          {{ driverStatusInlineMessageText }}
+        </span>
+      </div>
     </div>
   </div>
 </template>
@@ -637,7 +638,6 @@ export default {
 .driver-selection-field {
   display: inline-flex;
   min-width: 0;
-  position: relative;
 }
 
 .driver-selection-row {
@@ -646,6 +646,17 @@ export default {
   gap: 12px;
   flex-wrap: wrap;
   min-width: 0;
+}
+
+.driver-version-label {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  color: #515a6e;
+  font-size: 14px;
+  line-height: 22px;
+  white-space: nowrap;
 }
 
 .driver-status-loading-icon {
@@ -722,9 +733,6 @@ export default {
 }
 
 .driver-status-detail {
-  position: absolute;
-  left: 0;
-  top: 34px;
   display: inline-flex;
   align-items: center;
   gap: 6px;

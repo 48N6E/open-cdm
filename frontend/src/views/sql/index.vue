@@ -66,7 +66,7 @@
           </div>
           <!-- Empty Status -->
           <div v-if="!tabs.length" class="empty-state-container">
-            <SqlEmptyState :has-datasource="hasDatasource" />
+            <SqlEmptyState />
           </div>
 
           <div class="query-content-container" v-if="tabs.length">
@@ -365,9 +365,12 @@ export default {
     async getDataSourceData() {
       this.treeData = [];
       await this.listLevels();
+      const hasStoredExpandedKeys = this.$refs.dataSourceTree?.hasStoredExpandedKeys;
       if (this.treeData.length) {
         this.hasDatasource = true;
-        await this.listLevels(this.treeData[0], {}, () => {});
+        if (!hasStoredExpandedKeys) {
+          await this.listLevels(this.treeData[0], {}, () => {});
+        }
       }
     },
     setDataViewImage() {

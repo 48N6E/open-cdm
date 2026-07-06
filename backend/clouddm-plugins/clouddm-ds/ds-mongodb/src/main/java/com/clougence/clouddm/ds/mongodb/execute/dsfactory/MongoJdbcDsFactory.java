@@ -33,7 +33,6 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * https://dev.mysql.com/doc/refman/8.0/en/information-schema.html
- *
  * @author mode 2021/01/08 20:29
  */
 @Slf4j

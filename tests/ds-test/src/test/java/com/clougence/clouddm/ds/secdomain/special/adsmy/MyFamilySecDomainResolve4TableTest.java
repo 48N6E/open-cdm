@@ -4,11 +4,11 @@ import java.util.List;
 
 import org.junit.Test;
 
-import com.clougence.clouddm.ds.ads.analysis.ads4my.AdbMyResAnalysisSpi;
-import com.clougence.clouddm.ds.ads.analysis.ads4my.AdbMySecDomainResolveSpi;
-import com.clougence.clouddm.ds.ads.analysis.ads4my.AdbMySplitAnalysisSpi;
+import com.clougence.clouddm.ds.ads.sql.ads4my.resource.AdsMyResAnalysisSpi;
+import com.clougence.clouddm.ds.ads.sql.ads4my.security.AdsMySecDomainResolveSpi;
+import com.clougence.clouddm.ds.ads.sql.ads4my.split.AdsMySplitAnalysisSpi;
 import com.clougence.clouddm.ds.secdomain.family.mysql.MySecDomainResolve4TableTest;
-import com.clougence.clouddm.sdk.analysis.split.SplitScript;
+import com.clougence.clouddm.sdk.sql.split.SplitScript;
 import com.clougence.clouddm.sdk.model.analysis.resource.ResObject;
 import com.clougence.clouddm.sdk.service.secrules.RuleDomain;
 import com.clougence.clouddm.sdk.security.auth.SecQueryType;
@@ -17,9 +17,9 @@ import com.clougence.clouddm.base.metadata.ds.DataSourceType;
 public class MyFamilySecDomainResolve4TableTest extends MySecDomainResolve4TableTest {
 
     public MyFamilySecDomainResolve4TableTest(){
-        this.analysisSpi = new AdbMyResAnalysisSpi(null);
-        this.resolveSpi = new AdbMySecDomainResolveSpi(null);
-        this.splitAnalysisSpi = new AdbMySplitAnalysisSpi();
+        this.analysisSpi = new AdsMyResAnalysisSpi(null);
+        this.resolveSpi = new AdsMySecDomainResolveSpi(null);
+        this.splitAnalysisSpi = new AdsMySplitAnalysisSpi();
         this.dataSourceType = DataSourceType.AdbForMySQL;
     }
 

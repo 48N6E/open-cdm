@@ -29,6 +29,7 @@ import com.clougence.clouddm.base.metadata.ui.form.value.MapValueDef;
 import com.clougence.clouddm.base.metadata.ui.form.value.ValueDef;
 import com.clougence.clouddm.console.web.component.dsconfig.mode.DsConfigKvDef;
 import com.clougence.clouddm.console.web.global.i18n.I18nDmLabelKeys;
+import com.clougence.clouddm.platform.plugin.DsPluginInfo;
 import com.clougence.clouddm.platform.plugin.PluginManager;
 import com.clougence.clouddm.sdk.execute.dsconf.DsConfigSpi;
 import com.clougence.clouddm.sdk.execute.session.rdb.RdbIsolation;
@@ -37,35 +38,32 @@ import com.clougence.utils.StringUtils;
 
 public class DmDsConfigUiPanelFactory {
 
-    private static final String       PROP_CERTIFICATE_SUPPORT_TEXT = "certificate.supportText";
-    private static final String       PROP_CERTIFICATE_FILE_TYPES   = "certificate.fileTypes";
-    private static final List<String> TEXT_CERTIFICATE_TYPES        = List.of("pem", "key", "crt", "cer", "pk8");
-    private static final List<String> CERTIFICATE_TYPES             = List.of("pem", "crt", "cer");
-    private static final List<String> PG_CLIENT_KEY_TYPES           = List.of("pk8", "p12", "pfx");
-    private static final List<String> KEYSTORE_TYPES                = List.of("p12", "pfx", "jks");
-    private static final List<String> ALL_CERTIFICATE_TYPES         = List.of("pem", "key", "crt", "cer", "pk8", "p12", "pfx", "jks");
+    private static final String PROP_CERTIFICATE_SUPPORT_TEXT = "certificate.supportText";
+    private static final String PROP_CERTIFICATE_FILE_TYPES   = "certificate.fileTypes";
+    private static final String PROP_CERTIFICATE_TEXT_TYPES   = "certificate.textFileTypes";
+    private static final String PROP_CERTIFICATE_BINARY_TYPES = "certificate.binaryFileTypes";
 
     public List<UiPanel> create(DataSourceType dsType, Map<DsConfigGroup, Map<String, DsConfigKvDef>> fieldsByGroup) {
         Map<DsConfigGroup, UiPanel> panels = new EnumMap<>(DsConfigGroup.class);
         UiPanel general = generalPanel(dsType, fieldsByGroup.get(DsConfigGroup.GENERAL));
-        otherFields(general, DsConfigGroup.GENERAL, fieldsByGroup.get(DsConfigGroup.GENERAL));
+        otherFields(dsType, general, DsConfigGroup.GENERAL, fieldsByGroup.get(DsConfigGroup.GENERAL));
         panels.put(DsConfigGroup.GENERAL, general);
 
         UiPanel options = optionsPanel(dsType, fieldsByGroup.get(DsConfigGroup.OPTIONS));
-        otherFields(options, DsConfigGroup.OPTIONS, fieldsByGroup.get(DsConfigGroup.OPTIONS));
+        otherFields(dsType, options, DsConfigGroup.OPTIONS, fieldsByGroup.get(DsConfigGroup.OPTIONS));
         panels.put(DsConfigGroup.OPTIONS, options);
 
         Map<String, DsConfigKvDef> sshSslFields = new LinkedHashMap<>(safeFields(fieldsByGroup.get(DsConfigGroup.SSH_SSL)));
         UiPanel sshSsl = sshSslPanel(dsType, sshSslFields);
-        otherFields(sshSsl, DsConfigGroup.SSH_SSL, sshSslFields);
+        otherFields(dsType, sshSsl, DsConfigGroup.SSH_SSL, sshSslFields);
         panels.put(DsConfigGroup.SSH_SSL, sshSsl);
 
         UiPanel advanced = advancedPanel(dsType, fieldsByGroup.get(DsConfigGroup.ADVANCED));
-        otherFields(advanced, DsConfigGroup.ADVANCED, fieldsByGroup.get(DsConfigGroup.ADVANCED));
+        otherFields(dsType, advanced, DsConfigGroup.ADVANCED, fieldsByGroup.get(DsConfigGroup.ADVANCED));
         panels.put(DsConfigGroup.ADVANCED, advanced);
 
         UiPanel shadow = shadowPanel(dsType, fieldsByGroup.get(DsConfigGroup.SHADOW));
-        otherFields(shadow, DsConfigGroup.SHADOW, fieldsByGroup.get(DsConfigGroup.SHADOW));
+        otherFields(dsType, shadow, DsConfigGroup.SHADOW, fieldsByGroup.get(DsConfigGroup.SHADOW));
         panels.put(DsConfigGroup.SHADOW, shadow);
 
         DsConfigSpi configSpi = PluginManager.findDsConfigSpi(dsType);
@@ -88,15 +86,41 @@ public class DmDsConfigUiPanelFactory {
         };
     }
 
-    protected void otherFields(UiPanel panel, DsConfigGroup group, Map<String, DsConfigKvDef> fields) {
+    protected void otherFields(DataSourceType dsType, UiPanel panel, DsConfigGroup group, Map<String, DsConfigKvDef> fields) {
         Set<String> definedFields = new HashSet<>();
         collectDefinedFields(panel.getChildren(), definedFields);
         for (DsConfigKvDef configDef : safeFields(fields).values()) {
             if (definedFields.contains(configDef.getConfigName())) {
                 continue;
             }
-            panel.addField(createField(group, configDef));
+            if (DataSourceConfig.Fields.sqlEngine.equals(configDef.getConfigName())) {
+                panel.addField(sqlEngineField(dsType, group, configDef));
+            } else {
+                panel.addField(createField(group, configDef));
+            }
         }
+    }
+
+    protected UiPanelField sqlEngineField(DataSourceType dsType, DsConfigGroup group, DsConfigKvDef configDef) {
+        UiPanelField field = createField(group, configDef);
+        field.setType(UiPanelFieldType.Options);
+
+        DsPluginInfo dsPlugin = PluginManager.findDsPlugin(dsType);
+        List<String> sqlEngines = dsPlugin == null || dsPlugin.getBindSqlEngineNames() == null ? Collections.emptyList() : dsPlugin.getBindSqlEngineNames();
+        List<ValueDef> options = new ArrayList<>();
+        for (String sqlEngine : sqlEngines) {
+            options.add(fieldOptionDef(sqlEngineI18nKey(sqlEngine), sqlEngine));
+        }
+        field.setOptions(options);
+
+        if (StringUtils.isBlank(configDef.getConfigValue()) && !sqlEngines.isEmpty()) {
+            field.setDefaultValue(UiUtils.strValueDef(sqlEngines.get(0)));
+        }
+        return field;
+    }
+
+    protected String sqlEngineI18nKey(String sqlEngine) {
+        return "SQL_ENGINE_" + sqlEngine.trim().replaceAll("[^A-Za-z0-9]+", "_").replaceAll("^_+|_+$", "").toUpperCase(Locale.ROOT);
     }
 
     protected void collectDefinedFields(List<UiPanelField> fields, Set<String> definedFields) {
@@ -145,15 +169,15 @@ public class DmDsConfigUiPanelFactory {
         panel.addField(UiPanelField.builder()
             .field(host.getConfigName())
             .type(UiPanelFieldType.NetworkAddress)
-            .require(host.isValueRequire())
+            .require(true)
             .readOnly(host.isReadOnly())
             .defaultValue(UiUtils.strValueDef(host.getConfigValue()))
             .activeExpr(activeExpr(host))
             .titleI18N(host.getLabelKey())
             .descI18N(host.getDescKey())
             .build()
-            .addField(UiPanelField.builder().field(ADDRESS_FIELD).hide(true).defaultValue(UiUtils.strValueDef(hostParts[0])).build())
-            .addField(UiPanelField.builder().field(PORT_FIELD).hide(true).defaultValue(UiUtils.strValueDef(hostParts[1])).build()));
+            .addField(UiPanelField.builder().field(ADDRESS_FIELD).require(true).hide(true).defaultValue(UiUtils.strValueDef(hostParts[0])).build())
+            .addField(UiPanelField.builder().field(PORT_FIELD).require(true).hide(true).defaultValue(UiUtils.strValueDef(hostParts[1])).build()));
 
         // security
         DsConfigKvDef secTypeDef = fields.get(DataSourceConfig.Fields.securityType);
@@ -163,6 +187,7 @@ public class DmDsConfigUiPanelFactory {
         }
         UiPanelField secTypeField = createField(DsConfigGroup.GENERAL, secTypeDef);
         secTypeField.setType(UiPanelFieldType.Options);
+        secTypeField.setRequire(false);
 
         List<ValueDef> options = new ArrayList<>();
         for (SecurityType type : secTypes) {
@@ -210,12 +235,12 @@ public class DmDsConfigUiPanelFactory {
         return switch (type) {
             case NONE -> fieldOptionDef(SecurityType.NONE.getI18nKey(), SecurityType.NONE.name());
             case ONLY_USER -> fieldOptionDef(SecurityType.ONLY_USER.getI18nKey(), SecurityType.ONLY_USER.name())//
-                .addField(createField(DsConfigGroup.GENERAL, userName));
+                .addField(requiredField(DsConfigGroup.GENERAL, userName));
             case ONLY_PASSWD -> fieldOptionDef(SecurityType.ONLY_PASSWD.getI18nKey(), SecurityType.ONLY_PASSWD.name())//
-                .addField(createField(DsConfigGroup.GENERAL, password));
+                .addField(requiredField(DsConfigGroup.GENERAL, password));
             case USER_PASSWD -> fieldOptionDef(SecurityType.USER_PASSWD.getI18nKey(), SecurityType.USER_PASSWD.name())//
-                .addField(createField(DsConfigGroup.GENERAL, userName))
-                .addField(createField(DsConfigGroup.GENERAL, password));
+                .addField(requiredField(DsConfigGroup.GENERAL, userName))
+                .addField(requiredField(DsConfigGroup.GENERAL, password));
             case API_KEY -> fieldOptionDef(SecurityType.API_KEY.getI18nKey(), SecurityType.API_KEY.name())//
                 .addField(secField(password, ConfigI18nKey.CONFIG_ADD_DS_API_KEY_LABEL));
             case AK_SK -> fieldOptionDef(SecurityType.AK_SK.getI18nKey(), SecurityType.AK_SK.name())//
@@ -226,8 +251,14 @@ public class DmDsConfigUiPanelFactory {
     }
 
     private UiPanelField secField(DsConfigKvDef configDef, String labelKey) {
-        UiPanelField field = createField(DsConfigGroup.GENERAL, configDef);
+        UiPanelField field = requiredField(DsConfigGroup.GENERAL, configDef);
         field.setTitleI18N(labelKey);
+        return field;
+    }
+
+    private UiPanelField requiredField(DsConfigGroup group, DsConfigKvDef configDef) {
+        UiPanelField field = createField(group, configDef);
+        field.setRequire(true);
         return field;
     }
 
@@ -389,22 +420,25 @@ public class DmDsConfigUiPanelFactory {
                     case TRUST:
                         break;
                     case CA:
-                        option.addField(createCertificateField(dsType, mode, sslCaDataField));
+                        option.addField(createCertificateField(configSpi, mode, sslCaDataField));
                         break;
                     case TRUSTSTORE:
-                        option.addField(createStoreField(dsType, mode, sslCaDataField, ConfigI18nKey.CONFIG_DS_SSL_TRUSTSTORE_DATA_LABEL));
-                        option.addField(createStoreField(sslCaPasswordField, ConfigI18nKey.CONFIG_DS_SSL_TRUSTSTORE_PASSWORD_LABEL));
+                        option.addField(createStoreField(configSpi, mode, sslCaDataField, ConfigI18nKey.CONFIG_DS_SSL_TRUSTSTORE_DATA_LABEL));
+                        option
+                            .addField(createOptionalStorePasswordField(sslCaPasswordField, ConfigI18nKey.CONFIG_DS_SSL_TRUSTSTORE_PASSWORD_LABEL, ConfigI18nKey.CONFIG_ADD_DS_SSL_TRUSTSTORE_PASSWORD_DESC));
                         break;
                     case KEYSTORE_TRUSTSTORE:
-                        option.addField(createStoreField(dsType, mode, sslCaDataField, ConfigI18nKey.CONFIG_DS_SSL_TRUSTSTORE_DATA_LABEL));
-                        option.addField(createStoreField(sslCaPasswordField, ConfigI18nKey.CONFIG_DS_SSL_TRUSTSTORE_PASSWORD_LABEL));
-                        option.addField(createStoreField(dsType, mode, sslClientCertDataField, ConfigI18nKey.CONFIG_DS_SSL_KEYSTORE_DATA_LABEL));
-                        option.addField(createStoreField(sslClientKeyPasswordField, ConfigI18nKey.CONFIG_DS_SSL_KEYSTORE_PASSWORD_LABEL));
+                        option.addField(createStoreField(configSpi, mode, sslCaDataField, ConfigI18nKey.CONFIG_DS_SSL_TRUSTSTORE_DATA_LABEL));
+                        option
+                            .addField(createOptionalStorePasswordField(sslCaPasswordField, ConfigI18nKey.CONFIG_DS_SSL_TRUSTSTORE_PASSWORD_LABEL, ConfigI18nKey.CONFIG_ADD_DS_SSL_TRUSTSTORE_PASSWORD_DESC));
+                        option.addField(createStoreField(configSpi, mode, sslClientCertDataField, ConfigI18nKey.CONFIG_DS_SSL_KEYSTORE_DATA_LABEL));
+                        option
+                            .addField(createOptionalStorePasswordField(sslClientKeyPasswordField, ConfigI18nKey.CONFIG_DS_SSL_KEYSTORE_PASSWORD_LABEL, ConfigI18nKey.CONFIG_ADD_DS_SSL_KEYSTORE_PASSWORD_DESC));
                         break;
                     case CLIENT_CERT:
-                        option.addField(createCertificateField(dsType, mode, sslCaDataField));
-                        option.addField(createCertificateField(dsType, mode, sslClientCertDataField));
-                        option.addField(createCertificateField(dsType, mode, sslClientKeyDataField));
+                        option.addField(createCertificateField(configSpi, mode, sslCaDataField));
+                        option.addField(createCertificateField(configSpi, mode, sslClientCertDataField));
+                        option.addField(createCertificateField(configSpi, mode, sslClientKeyDataField));
                         option.addField(createField(DsConfigGroup.SSH_SSL, sslClientKeyPasswordField));
                         break;
                 }
@@ -414,42 +448,45 @@ public class DmDsConfigUiPanelFactory {
         return panel;
     }
 
-    private UiPanelField createCertificateField(DataSourceType dsType, SslMode sslMode, DsConfigKvDef configDef) {
+    private UiPanelField createCertificateField(DsConfigSpi configSpi, SslMode sslMode, DsConfigKvDef configDef) {
         UiPanelField field = createField(DsConfigGroup.SSH_SSL, configDef);
-        field.setProps(certificateProps(dsType, sslMode, configDef.getConfigName()));
+        field.setRequire(true);
+        field.setProps(certificateProps(configSpi, sslMode, configDef.getConfigName()));
         return field;
     }
 
-    private UiPanelField createStoreField(DataSourceType dsType, SslMode sslMode, DsConfigKvDef configDef, String labelKey) {
-        UiPanelField field = createCertificateField(dsType, sslMode, configDef);
+    private UiPanelField createStoreField(DsConfigSpi configSpi, SslMode sslMode, DsConfigKvDef configDef, String labelKey) {
+        UiPanelField field = createCertificateField(configSpi, sslMode, configDef);
         field.setTitleI18N(labelKey);
         return field;
     }
 
     private UiPanelField createStoreField(DsConfigKvDef configDef, String labelKey) {
         UiPanelField field = createField(DsConfigGroup.SSH_SSL, configDef);
+        field.setRequire(true);
         field.setTitleI18N(labelKey);
         return field;
     }
 
-    private Map<String, Object> certificateProps(DataSourceType dsType, SslMode sslMode, String configName) {
+    private UiPanelField createOptionalStorePasswordField(DsConfigKvDef configDef, String labelKey, String descKey) {
+        UiPanelField field = createField(DsConfigGroup.SSH_SSL, configDef);
+        field.setRequire(false);
+        field.setTitleI18N(labelKey);
+        field.setDescI18N(descKey);
+        return field;
+    }
+
+    private Map<String, Object> certificateProps(DsConfigSpi configSpi, SslMode sslMode, String configName) {
+        return certificateProps(configSpi.certificateTextFileTypes(sslMode, configName), //
+                configSpi.certificateBinaryFileTypes(sslMode, configName));
+    }
+
+    private Map<String, Object> certificateProps(List<String> textFileTypes, List<String> binaryFileTypes) {
         Map<String, Object> props = new LinkedHashMap<>();
-        if (sslMode == SslMode.TRUSTSTORE || sslMode == SslMode.KEYSTORE_TRUSTSTORE) {
-            props.put(PROP_CERTIFICATE_SUPPORT_TEXT, false);
-            props.put(PROP_CERTIFICATE_FILE_TYPES, KEYSTORE_TYPES);
-            return props;
-        }
-        if (dsType == DataSourceType.PostgreSQL) {
-            props.put(PROP_CERTIFICATE_SUPPORT_TEXT, true);
-            if (StringUtils.equals(configName, DataSourceConfig.Fields.sslClientKeyData)) {
-                props.put(PROP_CERTIFICATE_FILE_TYPES, PG_CLIENT_KEY_TYPES);
-            } else {
-                props.put(PROP_CERTIFICATE_FILE_TYPES, CERTIFICATE_TYPES);
-            }
-            return props;
-        }
-        props.put(PROP_CERTIFICATE_SUPPORT_TEXT, true);
-        props.put(PROP_CERTIFICATE_FILE_TYPES, ALL_CERTIFICATE_TYPES);
+        props.put(PROP_CERTIFICATE_TEXT_TYPES, textFileTypes);
+        props.put(PROP_CERTIFICATE_BINARY_TYPES, binaryFileTypes);
+        props.put(PROP_CERTIFICATE_SUPPORT_TEXT, textFileTypes != null && !textFileTypes.isEmpty());
+        props.put(PROP_CERTIFICATE_FILE_TYPES, binaryFileTypes);
         return props;
     }
 

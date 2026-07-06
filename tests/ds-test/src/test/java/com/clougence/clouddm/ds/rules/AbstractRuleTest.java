@@ -10,30 +10,30 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.Parser;
 
-import com.clougence.clouddm.dsfamily.analysis.secrules.rdb.RdbColumnDomain;
-import com.clougence.clouddm.dsfamily.analysis.secrules.rdb.RdbConstraintDomain;
-import com.clougence.clouddm.dsfamily.analysis.secrules.rdb.RdbSchemaDomain;
-import com.clougence.clouddm.dsfamily.analysis.secrules.rdb.RdbTableDomain;
-import com.clougence.clouddm.sdk.analysis.secrules.SecDomainResolveSpi;
+import com.clougence.clouddm.sdk.sql.secrules.rdb.RdbColumnDomain;
+import com.clougence.clouddm.sdk.sql.secrules.rdb.RdbConstraintDomain;
+import com.clougence.clouddm.sdk.sql.secrules.rdb.RdbSchemaDomain;
+import com.clougence.clouddm.sdk.sql.secrules.rdb.RdbTableDomain;
+import com.clougence.clouddm.sdk.sql.secrules.SecDomainResolveSpi;
 import com.clougence.clouddm.sdk.model.analysis.CodeInfo;
 import com.clougence.clouddm.sdk.model.analysis.ContextInfo;
 import com.clougence.clouddm.sdk.service.secrules.RuleDomain;
 import com.clougence.clouddm.sec.rules.domain.CheckerDomain;
 import com.clougence.clouddm.sec.rules.domain.func.FuncLoggerUtils;
 import com.clougence.clouddm.sec.rules.execute.DomainHelper;
-import com.clougence.detectrule.dsl.DetectRuleDslProvider;
+import com.clougence.detectrule.parser.DetectRuleDslProvider;
 import com.clougence.dslpaser.antlr.DslHelper;
 import com.clougence.dslpaser.antlr.DslProvider;
 import com.clougence.dslpaser.antlr.ThrowingListener;
 import com.clougence.dslpaser.ast.StatementSet;
-import com.clougence.detectrule.engine.lang.LangObject;
-import com.clougence.detectrule.engine.lang.ValueObject;
-import com.clougence.detectrule.engine.lang.reflect.ReflectHelper;
-import com.clougence.detectrule.engine.lang.reflect.Type;
-import com.clougence.detectrule.engine.lang.reflect.TypeType;
-import com.clougence.detectrule.engine.runtime.DefaultDataTimeValueParser;
-import com.clougence.detectrule.engine.runtime.EngineOption;
-import com.clougence.detectrule.engine.runtime.v1.DetectRuleEngineV1;
+import com.clougence.detectrule.lang.LangObject;
+import com.clougence.detectrule.lang.ValueObject;
+import com.clougence.detectrule.lang.reflect.ReflectHelper;
+import com.clougence.detectrule.lang.reflect.Type;
+import com.clougence.detectrule.lang.reflect.TypeType;
+import com.clougence.detectrule.runtime.DefaultDataTimeValueParser;
+import com.clougence.detectrule.runtime.EngineOption;
+import com.clougence.detectrule.runtime.v1.DetectRuleEngineV1;
 import com.clougence.clouddm.base.metadata.ds.DataSourceType;
 import com.clougence.utils.ResourcesUtils;
 
@@ -49,9 +49,9 @@ public abstract class AbstractRuleTest {
         DslHelper.register("DetectRule", new DetectRuleDslProvider());
 
         ReflectHelper.addIgnoreField("com.clougence.clouddm.sdk.service.secrules.RuleDomain.children");
-        ReflectHelper.addIgnoreField("com.clougence.clouddm.dsfamily.analysis.secrules.rdb.RdbSelectDomain.selectColumns");
+        ReflectHelper.addIgnoreField("com.clougence.clouddm.sdk.sql.secrules.rdb.RdbSelectDomain.selectColumns");
         ReflectHelper.addIgnoreField("com.clougence.clouddm.sdk.service.secrules.RuleDomain.splitScript");
-        ReflectHelper.addIgnoreField("com.clougence.clouddm.dsfamily.analysis.secrules.rdb.RdbSelectDomain.tableAlias");
+        ReflectHelper.addIgnoreField("com.clougence.clouddm.sdk.sql.secrules.rdb.RdbSelectDomain.tableAlias");
     }
 
     public static CharStream fromResource(String script) throws IOException {
