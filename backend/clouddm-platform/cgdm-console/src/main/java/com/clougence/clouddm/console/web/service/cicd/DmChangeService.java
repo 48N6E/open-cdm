@@ -17,7 +17,6 @@ package com.clougence.clouddm.console.web.service.cicd;
 
 import java.util.List;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.clougence.clouddm.api.common.rpc.ResWebData;
 import com.clougence.clouddm.console.web.component.cicd.model.ChangeExecuteInfo;
 import com.clougence.clouddm.console.web.component.cicd.model.ChangeTicketInfoResult;
@@ -26,18 +25,18 @@ import com.clougence.clouddm.console.web.model.fo.cicd.ChangeExecTaskListFO;
 import com.clougence.clouddm.console.web.model.fo.cicd.ChangeListFO;
 import com.clougence.clouddm.console.web.model.fo.ticket.DmAutoExecConfigFO;
 import com.clougence.clouddm.console.web.model.vo.DmBizLogVO;
+import com.clougence.clouddm.console.web.model.vo.DmPageVO;
 import com.clougence.clouddm.console.web.model.vo.cicd.ChangeBodyVO;
 import com.clougence.clouddm.console.web.model.vo.cicd.ChangeVO;
 import com.clougence.clouddm.console.web.model.vo.ticket.DmAutoExecJobVO;
 import com.clougence.clouddm.console.web.model.vo.ticket.DmAutoExecTaskVO;
-import com.clougence.clouddm.console.web.model.vo.ticket.DmPageVO;
 import com.clougence.clouddm.console.web.service.cicd.domain.CreateSuggest;
 import com.clougence.clouddm.platform.dal.model.cicd.DmChangeDO;
 import com.clougence.clouddm.platform.dal.model.cicd.DmChangeItemDO;
 
 public interface DmChangeService {
 
-    IPage<ChangeVO> queryChangeByFlowAndQuery(String ownerUid, long flowId, ChangeListFO fo);
+    DmPageVO<ChangeVO> queryChangeByFlowAndQuery(String ownerUid, long flowId, ChangeListFO fo);
 
     DmChangeDO queryChangeById(String ownerUid, long changeId);
 

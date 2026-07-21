@@ -13,30 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.clougence.clouddm.console.web.model.vo.ticket;
+package com.clougence.clouddm.console.web.model.fo.security;
 
-import java.util.ArrayList;
 import java.util.List;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.clougence.clouddm.sdk.security.auth.AuthKind;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class DmPageVO<T> {
+public class BatchModifyUserAuthFO {
 
-    private long    current;
-    private long    pages;
-    private long    size;
-    private long    total;
-    private List<T> records = new ArrayList<T>();
+    @NotNull
+    private AuthKind                     authKind;
 
-    public DmPageVO(IPage page){
-        this.current = page.getCurrent();
-        this.pages = page.getPages();
-        this.total = page.getTotal();
-        this.size = page.getSize();
-    }
+    @NotNull
+    private BatchModifyUserAuthOperation operation;
+
+    @NotEmpty
+    private List<String>                 targetUids;
+
+    @Valid
+    @NotEmpty
+    private List<ModifyAuthForAppend>    changes;
 }

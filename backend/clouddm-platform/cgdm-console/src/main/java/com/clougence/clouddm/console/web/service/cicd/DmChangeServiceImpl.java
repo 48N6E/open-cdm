@@ -41,12 +41,12 @@ import com.clougence.clouddm.console.web.model.fo.cicd.ChangeExecTaskListFO;
 import com.clougence.clouddm.console.web.model.fo.cicd.ChangeListFO;
 import com.clougence.clouddm.console.web.model.fo.ticket.DmAutoExecConfigFO;
 import com.clougence.clouddm.console.web.model.vo.DmBizLogVO;
+import com.clougence.clouddm.console.web.model.vo.DmPageVO;
 import com.clougence.clouddm.console.web.model.vo.cicd.ChangeBodyItemVO;
 import com.clougence.clouddm.console.web.model.vo.cicd.ChangeBodyVO;
 import com.clougence.clouddm.console.web.model.vo.cicd.ChangeVO;
 import com.clougence.clouddm.console.web.model.vo.ticket.DmAutoExecJobVO;
 import com.clougence.clouddm.console.web.model.vo.ticket.DmAutoExecTaskVO;
-import com.clougence.clouddm.console.web.model.vo.ticket.DmPageVO;
 import com.clougence.clouddm.console.web.service.cicd.domain.CreateSuggest;
 import com.clougence.clouddm.console.web.service.cicd.domain.CreateSuggestType;
 import com.clougence.clouddm.console.web.service.cicd.domain.Item;
@@ -99,7 +99,7 @@ public class DmChangeServiceImpl implements DmChangeService {
     private ApprovalFlowService approvalFlowService;
 
     @Override
-    public IPage<ChangeVO> queryChangeByFlowAndQuery(String ownerUid, long flowId, ChangeListFO fo) {
+    public DmPageVO<ChangeVO> queryChangeByFlowAndQuery(String ownerUid, long flowId, ChangeListFO fo) {
         Page<?> page = PageUtils.startPage(fo.getPage());
 
         // page
@@ -111,9 +111,10 @@ public class DmChangeServiceImpl implements DmChangeService {
 
         DmChangeFlowDO flowDO = this.changeFlowDal.flowMapper().queryByOwnerAndId(ownerUid, flowId);
         IPage<DmChangeDO> pageData = this.changeFlowDal.changeMapper().listChangeByConditionAndPage(page, queryParams);
+        DmPageVO<ChangeVO> results = new DmPageVO<>(pageData);
         List<DmChangeDO> records = pageData.getRecords();
         if (CollectionUtils.isEmpty(records)) {
-            return new Page<>();
+            return results;
         }
         Map<Long, DmChangeFlowDO> devopsMap;
         Map<Long, DmDsDO> dsMap;
@@ -146,12 +147,7 @@ public class DmChangeServiceImpl implements DmChangeService {
             return DmConvertUtils.convertToChangeVO(flowDO, obj, devopsMap, dsMap, scmMap);
         }).collect(Collectors.toList());
 
-        IPage<ChangeVO> results = new Page<>();
         results.setRecords(vos);
-        results.setCurrent(pageData.getCurrent());
-        results.setSize(pageData.getSize());
-        results.setPages(pageData.getPages());
-        results.setTotal(pageData.getTotal());
         return results;
     }
 
