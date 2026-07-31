@@ -14,10 +14,25 @@
         :handle-add-tab="handleAddTab"
         :set-loading="setLoading"
         :refresh-tab-select-options="refreshTabSelectOptions"
+        @sidebar-state-change="handleDataSourceSidebarStateChange"
       />
       <div class="query-container">
         <div class="content">
           <div class="tab-wrap">
+            <div class="sql-sidebar-toggle-slot" :class="{ 'sql-sidebar-toggle-slot--visible': dataSourceSidebarHidden }">
+              <transition name="sql-sidebar-toggle">
+                <button
+                  v-if="dataSourceSidebarHidden"
+                  type="button"
+                  class="sql-tab-sidebar-toggle"
+                  :aria-label="$t('sql-expand-datasource-sidebar')"
+                  :title="$t('sql-expand-datasource-sidebar')"
+                  @click="handleExpandDataSourceSidebar"
+                >
+                  <DoubleRightOutlined aria-hidden="true" />
+                </button>
+              </transition>
+            </div>
             <div class="sql-tabs-style" v-if="tabs.length">
               <a-tabs type="card" v-model:activeKey="active" @tabClick="handleChangeTab" :key="tabsKey">
                 <a-tab-pane v-for="(tab, index) in tabs" :key="tab.key">
@@ -76,38 +91,6 @@
           <div class="query-content-container" v-if="tabs.length">
             <loading :active.sync="fullLoading" :is-full-page="false"></loading>
             <div v-if="currentTab.type === TAB_TYPE.QUERY && globalDsSetting[currentTab.dsType]" class="query-content">
-              <div class="query-schema-select">
-                <div style="display: flex; align-items: center">
-                  <div class="status">
-                    <CheckCircleOutlined
-                      v-if="successStatus"
-                      :style="{ fontSize: '16px', cursor: 'pointer', color: '#52c41a' }"
-                      @click="handleClickDsStatusIcon"
-                    />
-                    <a-tooltip v-else placement="left">
-                      <CloseCircleOutlined :style="{ fontSize: '16px', cursor: 'pointer', color: '#ff4d4f' }" @click="handleClickDsStatusIcon" />
-                      <template #title>
-                        <div v-if="!socket.connected">{{ socket.msgContent }}</div>
-                        <div v-if="!currentTab.connected">{{ currentTab.msgContent }}</div>
-                      </template>
-                    </a-tooltip>
-                  </div>
-                  <a-select
-                    v-if="currentTab.selectOptions"
-                    class="schema-select-style"
-                    v-model:value="currentTab.selectValue"
-                    show-search
-                    size="small"
-                    :options="currentTab.selectOptions || []"
-                    @select="handleChangeSchema"
-                  ></a-select>
-                  <div style="white-space: nowrap">
-                    @{{ currentTab.node.INSTANCE.attr.dsHost }}【{{
-                      currentTab.node.INSTANCE.attr.dsInstanceDesc || currentTab.node.INSTANCE.attr.dsInstance
-                    }}】
-                  </div>
-                </div>
-              </div>
               <div class="query">
                 <TableList
                   ref="tableList"
@@ -131,7 +114,29 @@
                       :completion-data="completionData"
                       :rdb-object-detail="rdbObjectDetail"
                       :handle-click-ds-status-icon="handleClickDsStatusIcon"
-                    />
+                    >
+                      <template #connection-context>
+                        <div class="query-schema-select__content">
+                          <a-select
+                            v-if="currentTab.selectOptions"
+                            class="schema-select-style"
+                            v-model:value="currentTab.selectValue"
+                            show-search
+                            size="small"
+                            :options="currentTab.selectOptions || []"
+                            @select="handleChangeSchema"
+                          ></a-select>
+                          <CustomIcon
+                            class="query-connection-icon"
+                            :type="currentTab.dsType"
+                            :instance-type="currentTab.node.INSTANCE.attr.dsDeployType"
+                            size="14px"
+                            aria-hidden="true"
+                          />
+                          <div class="query-connection-label">@{{ currentTab.node.INSTANCE.attr.dsHost }}</div>
+                        </div>
+                      </template>
+                    </SqlViewer>
                   </div>
                   <div ref="result" class="result-wrapper">
                     <Result :id="`result_${currentTab.key}`" :ref="`result_`" :resultList="currentTab.resultList" :tab="currentTab" />
@@ -175,7 +180,6 @@
 </template>
 <script>
 import appLogger from '@/utils/logger';
-import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons-vue';
 import Loading from 'vue-loading-overlay';
 import 'vue-loading-overlay/dist/css/index.css';
 import { cloneDeep as deepClone } from '@/utils/lodash';
@@ -202,6 +206,7 @@ import { nanoid } from 'nanoid';
 import { TabManager } from '@/views/sql/tabManager';
 import CustomIcon from '@/components/function/CustomIcon.vue';
 import ContextMenu from '@imengyu/vue3-context-menu';
+import { DoubleRightOutlined } from '@ant-design/icons-vue';
 
 window.luckysheetData = {
   activeKey: '',
@@ -219,9 +224,8 @@ export default {
   name: 'Sql',
   mixins: [browseMixin, sqlMixin],
   components: {
-    CheckCircleOutlined,
-    CloseCircleOutlined,
     CustomIcon,
+    DoubleRightOutlined,
     LuckySheetDataView,
     DataSourceTree,
     StructView,
@@ -252,6 +256,7 @@ export default {
       treeData: [],
       newMode: true,
       TAB_ACTION,
+      dataSourceSidebarHidden: false,
       dataSourceWidth: 250,
       preDataSourceWidth: 0,
       ACTION_TYPE,
@@ -316,13 +321,16 @@ export default {
     fullLoading() {
       return this.loading;
     },
-    successStatus() {
-      return this.socket.connected && this.currentTab.connected;
-    },
     ...mapState(['globalDsSetting', 'userInfo', 'socket']),
     ...mapGetters(['isDesktop', 'getNodeType', 'getLeafGroup', 'getLevels', 'getLeafExpand'])
   },
   methods: {
+    handleDataSourceSidebarStateChange(hidden) {
+      this.dataSourceSidebarHidden = hidden;
+    },
+    handleExpandDataSourceSidebar() {
+      this.$refs.dataSourceTree?.handleSwitchHide();
+    },
     onContextmenu(event, tab) {
       this.contextData = tab;
       ContextMenu.showContextMenu({
@@ -1031,6 +1039,9 @@ export default {
           if (this.tabs.length) {
             let hasActiveKey = false;
             this.tabs.forEach((tab) => {
+              if (tab.type === TAB_TYPE.STRUCT) {
+                this.resetStoredStructEditorState(tab);
+              }
               if (!tab.dsId && tab.node) {
                 tab.dsId = tab.node.INSTANCE.id;
               }
@@ -1097,6 +1108,26 @@ export default {
       }
       this.currentTab.text = sqlViewer.monacoEditor.getValue();
     },
+    resetStoredStructEditorState(tab) {
+      Object.assign(tab, {
+        formData: {
+          tableInfo: {}
+        },
+        originalFormData: {},
+        initTableData: {
+          tableInfo: {}
+        },
+        selectedIndex: -1,
+        nodeType: '',
+        selectedNode: null,
+        selectedSchema: null,
+        schemaDef: {},
+        order: [],
+        validationTarget: null,
+        init: false,
+        isEditing: false
+      });
+    },
     storeQueryTabs() {
       appLogger.debug('store query tabs');
       const { uid } = this.userInfo;
@@ -1105,6 +1136,9 @@ export default {
       const tabData = deepClone(this.tabs);
 
       tabData.forEach((tab) => {
+        if (tab.type === TAB_TYPE.STRUCT) {
+          this.resetStoredStructEditorState(tab);
+        }
         if (tab.leafGroup) {
           tab.leafGroup.forEach((leaf) => {
             tab[leaf.type] = {
@@ -1669,19 +1703,103 @@ export default {
 // tab Bar
 .tab-wrap {
   display: flex;
-  justify-content: right;
+  height: 44px;
+  flex: 0 0 44px;
+  justify-content: flex-start;
+
+  .sql-sidebar-toggle-slot {
+    position: relative;
+    width: 0;
+    height: 44px;
+    flex: 0 0 0;
+    overflow: hidden;
+    transition:
+      width 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+      flex-basis 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &--visible {
+      width: 44px;
+      flex-basis: 44px;
+    }
+  }
+
+  .sql-tab-sidebar-toggle {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-right: 1px solid var(--border-primary);
+    border-bottom: 1px solid var(--border-primary);
+    border-radius: 0;
+    background: var(--bg-secondary);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition:
+      color 0.2s ease,
+      background-color 0.2s ease;
+
+    &:hover,
+    &:focus-visible {
+      color: var(--text-primary);
+      background: var(--bg-hover);
+    }
+
+    &:focus-visible {
+      outline: 1px solid var(--primary-color);
+      outline-offset: -2px;
+    }
+  }
+
+  .sql-sidebar-toggle-enter-active {
+    transition:
+      opacity 0.16s ease-out 0.08s,
+      transform 0.2s cubic-bezier(0.22, 1, 0.36, 1) 0.06s;
+  }
+
+  .sql-sidebar-toggle-leave-active {
+    transition:
+      opacity 0.1s ease-in,
+      transform 0.12s ease-in;
+  }
+
+  .sql-sidebar-toggle-enter-from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+
+  .sql-sidebar-toggle-leave-to {
+    opacity: 0;
+    transform: translateX(-3px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sql-sidebar-toggle-slot,
+    .sql-sidebar-toggle-enter-active,
+    .sql-sidebar-toggle-leave-active {
+      transition: none;
+    }
+  }
 
   .sql-tabs-style {
-    width: calc(100% - 29px);
+    height: 44px;
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
 
     :deep(.ant-tabs-nav) {
+      height: 44px;
       margin: 0;
     }
 
     :deep(.ant-tabs-nav-list) {
-      align-items: flex-end;
-      min-height: 40px;
-      padding-top: 6px;
+      align-items: stretch;
+      min-height: 44px;
+      padding-top: 0;
       box-sizing: border-box;
     }
 
@@ -1694,8 +1812,8 @@ export default {
     }
 
     :deep(.ant-tabs-extra-content) {
-      height: 40px;
-      line-height: 40px;
+      height: 44px;
+      line-height: 44px;
       border-bottom: 1px solid var(--border-primary);
       padding-right: 8px;
     }
@@ -1705,11 +1823,16 @@ export default {
     }
 
     :deep(.ant-tabs-tab) {
+      height: 44px;
+      align-items: center;
+      margin: 0 !important;
       background-color: var(--bg-tertiary) !important;
       border-color: var(--border-primary) !important;
+      border-top: 0 !important;
+      border-left: 0 !important;
       color: var(--text-secondary) !important;
-      border-radius: 6px 6px 0 0 !important;
-      padding: 5px 8px !important;
+      border-radius: 0 !important;
+      padding: 0 8px !important;
 
       &:hover {
         color: var(--primary-color) !important;
@@ -1743,10 +1866,12 @@ export default {
 }
 
 .schema-select-style {
-  display: inline-block;
-  width: 400px;
-  margin-left: 5px;
-  margin-right: 5px;
+  display: block;
+  flex: 0 1 240px;
+  width: 240px;
+  min-width: 160px;
+  max-width: 240px;
+  margin: 0;
   font-size: 12px;
 
   :deep(.vs__dropdown-toggle) {
@@ -1765,6 +1890,29 @@ export default {
   :deep(.vs__search:focus) {
     margin: 2px 0 0;
   }
+}
+
+.query-schema-select__content {
+  display: flex;
+  width: 100%;
+  max-width: 680px;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.query-connection-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.query-connection-icon {
+  flex: 0 0 auto;
 }
 
 // tab dropdown menu
