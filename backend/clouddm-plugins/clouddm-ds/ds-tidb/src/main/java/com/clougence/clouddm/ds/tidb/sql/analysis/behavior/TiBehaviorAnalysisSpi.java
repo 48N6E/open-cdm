@@ -6,7 +6,13 @@
  */
 package com.clougence.clouddm.ds.tidb.sql.analysis.behavior;
 
-import java.util.*;
+import java.io.Reader;
+import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 import org.antlr.v4.runtime.Parser;
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -14,6 +20,7 @@ import org.antlr.v4.runtime.tree.AbstractParseTreeVisitor;
 import org.antlr.v4.runtime.tree.ParseTree;
 
 import com.clougence.clouddm.ds.tidb.sql.parser.TiDBDslProvider;
+import com.clougence.clouddm.ds.tidb.sql.parser.TiSplitAnalysisSpi;
 import com.clougence.clouddm.ds.tidb.sql.parser.antlr.TiDBParserBaseVisitor;
 import com.clougence.clouddm.ds.tidb.sql.parser.antlr.TiDBParser.*;
 import com.clougence.clouddm.sdk.sql.analysis.behavior.*;
@@ -21,16 +28,23 @@ import com.clougence.clouddm.sdk.sql.parser.SplitQueryType;
 import com.clougence.dslpaser.antlr.DslHelper;
 import com.clougence.schema.umi.struts.UmiTypes;
 import com.clougence.sql.common.analysis.behavior.RdbBehaviorObjectFactory;
-import com.clougence.utils.StringUtils;
 
 public class TiBehaviorAnalysisSpi implements BehaviorAnalysisSpi {
     @Override
-    public List<StatementBehavior> analysisBehavior(String query, Map<UmiTypes, Object> levels, int baseLine, int baseColumn) {
-        if (StringUtils.isBlank(query)) {
-            return Collections.emptyList();
-        }
+    public Stream<StatementBehavior> analysisBehaviorStream(Reader queryReader, Map<UmiTypes, Object> levels, int baseLine, int baseColumn) {
+        var scripts = new TiSplitAnalysisSpi().splitScriptStream(queryReader, List.of(), baseLine, baseColumn);
+        return scripts.flatMap(script -> {
+            StringReader reader = new StringReader(script.getScript());
+            int codeLine = script.getBodyStartCodeLine();
+            int codeColumn = script.getBodyStartCodeColumn();
+
+            return analyzeStatement(reader, levels, codeLine, codeColumn).stream();
+        }).onClose(scripts::close);
+    }
+
+    private List<StatementBehavior> analyzeStatement(Reader queryReader, Map<UmiTypes, Object> levels, int baseLine, int baseColumn) {
         TiBehaviorParserVisitor[] holder = new TiBehaviorParserVisitor[1];
-        DslHelper.doVisitor(TiDBDslProvider.INSTANCE, query, (lexer, parser) -> {
+        DslHelper.doVisitor(TiDBDslProvider.INSTANCE, queryReader, (lexer, parser) -> {
             holder[0] = new TiBehaviorParserVisitor(parser, levels, baseLine, baseColumn);
             return holder[0];
         });

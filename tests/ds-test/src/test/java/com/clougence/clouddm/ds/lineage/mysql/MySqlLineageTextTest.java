@@ -16,6 +16,7 @@
 package com.clougence.clouddm.ds.lineage.mysql;
 
 import java.io.IOException;
+import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -24,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
+import org.antlr.v4.runtime.tree.ParseTree;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DynamicTest;
@@ -31,7 +33,6 @@ import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
-import org.antlr.v4.runtime.tree.ParseTree;
 
 import com.clougence.clouddm.ds.TextCaseSupport;
 import com.clougence.clouddm.ds.VirtualMetaService;
@@ -59,13 +60,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Execution(ExecutionMode.CONCURRENT)
 public abstract class MySqlLineageTextTest {
 
-    private static final String                          SHORT_DELIMITER = "----------";
-    private static final ObjectMapper                    JSON            = new ObjectMapper();
-    private static final String                          EXPECT_OUTPUT   = System.getenv("MYSQL_LINEAGE_EXPECT_OUTPUT_DIR");
+    private static final String                   SHORT_DELIMITER = "----------";
+    private static final ObjectMapper             JSON            = new ObjectMapper();
+    private static final String                   EXPECT_OUTPUT   = System.getenv("MYSQL_LINEAGE_EXPECT_OUTPUT_DIR");
 
-    private final String                                 resourceDirectory;
-    private final String                                 version;
-    private final Map<String, List<RecordedCase>>         recordedCases = new ConcurrentHashMap<>();
+    private final String                          resourceDirectory;
+    private final String                          version;
+    private final Map<String, List<RecordedCase>> recordedCases   = new ConcurrentHashMap<>();
 
     protected MySqlLineageTextTest(String directoryName, String version){
         this.resourceDirectory = "lineage/mysql/" + directoryName;
@@ -75,8 +76,7 @@ public abstract class MySqlLineageTextTest {
     @TestFactory
     public Stream<DynamicTest> lineagePatterns() {
         CorpusMetaService metaService = new CorpusMetaService(version);
-        ThreadLocal<LineageAnalysisSpi> analysisSpi = ThreadLocal.withInitial(
-                () -> new MySqlEngineSpi(metaService).lineageAnalysisSpi(SqlParserParameters.ofVersion(version)));
+        ThreadLocal<LineageAnalysisSpi> analysisSpi = ThreadLocal.withInitial(() -> new MySqlEngineSpi(metaService).lineageAnalysisSpi(SqlParserParameters.ofVersion(version)));
 
         return fixtureResources().stream()
             .flatMap(resourcePath -> loadLineageCases(resourcePath).stream())
@@ -191,8 +191,7 @@ public abstract class MySqlLineageTextTest {
     }
 
     private static String exceptionJson(Throwable exception) throws JsonProcessingException {
-        return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(
-                Map.of("exception", exception.getClass().getSimpleName()));
+        return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("exception", exception.getClass().getSimpleName()));
     }
 
     private static Throwable rootCause(Throwable throwable) {
@@ -296,7 +295,7 @@ public abstract class MySqlLineageTextTest {
 
         private ParsedSchema parseSchema(String sql) {
             AtomicReference<CorpusCstVisitor> visitorRef = new AtomicReference<>();
-            DslHelper.doVisitor(provider, sql, (lexer, parser) -> {
+            DslHelper.doVisitor(provider, new StringReader(sql), (lexer, parser) -> {
                 CorpusCstVisitor visitor = new CorpusCstVisitor(parser);
                 visitorRef.set(visitor);
                 return visitor;
@@ -317,9 +316,7 @@ public abstract class MySqlLineageTextTest {
 
             ParsedSchema schemaInfo = Objects.requireNonNull(currentSchema.get(), "SQL context is missing");
             LinkedHashSet<String> inferredColumns = schemaInfo.columns(levelsParam, tableName);
-            if (columns.size() == 1 && columns.containsKey("id")
-                    && !inferredColumns.isEmpty()
-                    && inferredColumns.stream().noneMatch("id"::equalsIgnoreCase)) {
+            if (columns.size() == 1 && columns.containsKey("id") && !inferredColumns.isEmpty() && inferredColumns.stream().noneMatch("id"::equalsIgnoreCase)) {
                 columns.clear();
             }
             if (columns.isEmpty() && inferredColumns.isEmpty()) {
@@ -384,8 +381,7 @@ public abstract class MySqlLineageTextTest {
             for (LineageRelation relation : block.relations()) {
                 relations.add(analyzeRelation(relation, outerScope, visibleCtes, tables, mergeHints));
             }
-            Scope scope = new Scope(tables, mergeHints,
-                    relations.stream().anyMatch(RelationHint::virtual), outerScope);
+            Scope scope = new Scope(tables, mergeHints, relations.stream().anyMatch(RelationHint::virtual), outerScope);
             LinkedHashSet<TableKey> queryTargets = new LinkedHashSet<>();
             relations.forEach(relation -> queryTargets.addAll(relation.targets()));
             for (LineageSelectItem item : block.selectItems()) {
@@ -408,25 +404,22 @@ public abstract class MySqlLineageTextTest {
             ctes.forEach(cte -> visibleCtes.putIfAbsent(normalizeName(cte.name()), Set.of()));
             for (LineageCte cte : ctes) {
                 Set<TableKey> previousTables = Set.copyOf(tableColumns.keySet());
-                LinkedHashSet<TableKey> targets = new LinkedHashSet<>(
-                        analyzeQuery(cte.query(), outerScope, visibleCtes));
-                tableColumns.keySet().stream()
-                    .filter(table -> !previousTables.contains(table))
-                    .forEach(targets::add);
+                LinkedHashSet<TableKey> targets = new LinkedHashSet<>(analyzeQuery(cte.query(), outerScope, visibleCtes));
+                tableColumns.keySet().stream().filter(table -> !previousTables.contains(table)).forEach(targets::add);
                 if (cte.recursive() && cte.query().branches().size() > 1) {
-                    cte.query().branches().subList(1, cte.query().branches().size()).stream()
+                    cte.query()
+                        .branches()
+                        .subList(1, cte.query().branches().size())
+                        .stream()
                         .flatMap(branch -> branch.selectItems().stream())
                         .flatMap(item -> item.values().stream())
                         .filter(LineageColumnReference.class::isInstance)
                         .map(LineageColumnReference.class::cast)
                         .filter(reference -> reference.qualifier() == null)
-                        .forEach(reference -> targets.forEach(target -> tableColumns
-                            .computeIfAbsent(target, ignored -> new LinkedHashSet<>())
-                            .add(reference.column())));
+                        .forEach(reference -> targets.forEach(target -> tableColumns.computeIfAbsent(target, ignored -> new LinkedHashSet<>()).add(reference.column())));
                 }
                 visibleCtes.put(normalizeName(cte.name()), Set.copyOf(targets));
-                qualifierTargets.computeIfAbsent(normalizeName(cte.name()), ignored -> new LinkedHashSet<>())
-                    .addAll(targets);
+                qualifierTargets.computeIfAbsent(normalizeName(cte.name()), ignored -> new LinkedHashSet<>()).addAll(targets);
                 registerVirtualColumns(cte.name(), cte.columnAliases(), cte.query());
             }
             return visibleCtes;
@@ -452,8 +445,7 @@ public abstract class MySqlLineageTextTest {
                 if (cteTargets != null) {
                     RelationHint result = new RelationHint(named.alias(), named.name(), cteTargets, true);
                     if (named.alias() != null && !named.alias().isBlank()) {
-                        virtualColumns.put(normalizeName(named.alias()),
-                                virtualColumns.getOrDefault(normalizeName(named.name()), Set.of()));
+                        virtualColumns.put(normalizeName(named.alias()), virtualColumns.getOrDefault(normalizeName(named.name()), Set.of()));
                     }
                     registerQualifiers(result);
                     return result;
@@ -492,16 +484,14 @@ public abstract class MySqlLineageTextTest {
                 return;
             }
             String qualifier = normalizeName(hint.qualifier());
-            if (virtualColumns.getOrDefault(qualifier, Set.of()).stream()
-                    .anyMatch(column -> column.equalsIgnoreCase(hint.column()))) {
+            if (virtualColumns.getOrDefault(qualifier, Set.of()).stream().anyMatch(column -> column.equalsIgnoreCase(hint.column()))) {
                 return;
             }
             Set<TableKey> targets = qualifierTargets.getOrDefault(qualifier, new LinkedHashSet<>());
             targets.forEach(target -> tableColumns.computeIfAbsent(target, ignored -> new LinkedHashSet<>()).add(hint.column()));
         }
 
-        private void registerVirtualColumns(String qualifier, List<String> aliases,
-                                            LineageQuery query) {
+        private void registerVirtualColumns(String qualifier, List<String> aliases, LineageQuery query) {
             if (qualifier == null || qualifier.isBlank()) {
                 return;
             }
@@ -509,11 +499,7 @@ public abstract class MySqlLineageTextTest {
             if (aliases != null && !aliases.isEmpty()) {
                 names.addAll(aliases);
             } else if (!query.branches().isEmpty()) {
-                query.branches().get(0).selectItems().stream()
-                    .filter(item -> !item.wildcard())
-                    .map(LineageSelectItem::outputName)
-                    .filter(Objects::nonNull)
-                    .forEach(names::add);
+                query.branches().get(0).selectItems().stream().filter(item -> !item.wildcard()).map(LineageSelectItem::outputName).filter(Objects::nonNull).forEach(names::add);
             }
             virtualColumns.put(normalizeName(qualifier), Set.copyOf(names));
         }
@@ -548,7 +534,7 @@ public abstract class MySqlLineageTextTest {
                 return true;
             }
             if (guessUnqualified && !scope.hasVirtualRelation() && !scope.tables().isEmpty()
-                    && scope.tables().stream().map(TableRef::key).distinct().count() == scope.tables().size()) {
+                && scope.tables().stream().map(TableRef::key).distinct().count() == scope.tables().size()) {
                 tableColumns.computeIfAbsent(scope.tables().get(0).key(), ignored -> new LinkedHashSet<>()).add(column);
                 return true;
             }
@@ -567,10 +553,7 @@ public abstract class MySqlLineageTextTest {
                 .findFirst()
                 .map(LinkedHashSet::new)
                 .orElseGet(LinkedHashSet::new);
-            int maxSyntheticColumn = columns.stream()
-                .mapToInt(ParsedSchema::syntheticColumnIndex)
-                .max()
-                .orElse(0);
+            int maxSyntheticColumn = columns.stream().mapToInt(ParsedSchema::syntheticColumnIndex).max().orElse(0);
             if (maxSyntheticColumn > 0) {
                 LinkedHashSet<String> expanded = new LinkedHashSet<>();
                 for (int index = 1; index <= maxSyntheticColumn; index++) {
@@ -607,8 +590,7 @@ public abstract class MySqlLineageTextTest {
             return tableColumns.toString();
         }
 
-        private record Scope(List<TableRef> tables, List<MergeHint> mergeHints,
-                             boolean hasVirtualRelation, Scope outer) {
+        private record Scope(List<TableRef> tables, List<MergeHint> mergeHints, boolean hasVirtualRelation, Scope outer) {
         }
 
         private record MergeHint(boolean natural, Set<String> columns, Set<TableKey> targets) {
@@ -631,8 +613,7 @@ public abstract class MySqlLineageTextTest {
             }
         }
 
-        private record RelationHint(String alias, String name, Set<TableKey> targets,
-                                    boolean virtual) {
+        private record RelationHint(String alias, String name, Set<TableKey> targets, boolean virtual) {
 
             RelationHint{
                 targets = Set.copyOf(targets);
