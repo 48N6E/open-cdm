@@ -3,7 +3,12 @@
     <div class="page-shell__body ticket-detail-container">
       <section class="page-section ticket-info-section">
         <div class="ticket-info-section__header">
-          <div class="page-section__title ticket-info-section__title">{{ ticketDetail.ticketTitle || '-' }}</div>
+          <div class="ticket-info-section__heading">
+            <div class="ticket-info-section__label">{{ $t('ticket-information') }}</div>
+            <div class="ticket-info-section__title" :title="ticketDetail.ticketTitle || '-'">
+              {{ ticketDetail.ticketTitle || '-' }}
+            </div>
+          </div>
           <div class="ticket-overview__actions">
             <Button class="warning-btn" v-if="ticketDetail.canApproval" type="primary" @click="handleShowApprovalModal">
               {{ $t('shen-pi') }}
@@ -485,11 +490,6 @@
           :text="ticketSqlContent"
           key="ticket-sql-content"
           :ds-type="ticketDetail.dataSourceType"
-          :font-family="sqlEditorTypography.fontFamily"
-          :font-size="sqlEditorTypography.fontSize"
-          :font-weight="sqlEditorTypography.fontWeight"
-          :line-height="sqlEditorTypography.lineHeight"
-          :letter-spacing="sqlEditorTypography.letterSpacing"
           @reach-bottom="loadNextTicketSqlContent"
         />
       </section>
@@ -568,11 +568,6 @@
         key="ticket-sql-content-modal"
         :max-height="500"
         :ds-type="ticketDetail.dataSourceType"
-        :font-family="sqlEditorTypography.fontFamily"
-        :font-size="sqlEditorTypography.fontSize"
-        :font-weight="sqlEditorTypography.fontWeight"
-        :line-height="sqlEditorTypography.lineHeight"
-        :letter-spacing="sqlEditorTypography.letterSpacing"
         @reach-bottom="loadNextTicketSqlContent"
       />
       <template #footer>
@@ -699,7 +694,6 @@ import appLogger from '@/utils/logger';
 import { mapState } from 'vuex';
 import { TICKET_PROCESS_STATUS } from '@/const';
 import ReadOnlyEditor from '@/components/editor/ReadOnlyEditor';
-import { SQL_CHANGE_EDITOR_TYPOGRAPHY } from '@/components/editor/sqlEditorTypography';
 import copyMixin from '@/mixins/copyMixin';
 import { isCk, isMongoDB, RULE_WARN_LEVEL } from '@/utils';
 
@@ -778,7 +772,6 @@ export default {
   mixins: [copyMixin],
   data() {
     return {
-      sqlEditorTypography: SQL_CHANGE_EDITOR_TYPOGRAPHY,
       autoExec: false,
       RULE_WARN_LEVEL,
       noPassedRuleList: [],
@@ -2518,6 +2511,10 @@ export default {
   box-shadow: 0 2px 8px rgba(31, 41, 55, 0.05);
 }
 
+.ticket-progress-card {
+  container-type: inline-size;
+}
+
 .ticket-auth-list {
   margin-top: 18px;
   border-top: 1px solid var(--border-light);
@@ -2628,6 +2625,7 @@ export default {
 }
 
 .ticket-info-section__header,
+.ticket-info-section__heading,
 .ticket-overview__actions,
 .ticket-meta-item__value,
 .ticket-meta-item__label--with-icon,
@@ -2650,13 +2648,35 @@ export default {
 }
 
 .ticket-info-section__header {
-  align-items: flex-start;
+  align-items: center;
   gap: 24px;
 }
 
-.ticket-info-section__title {
+.ticket-info-section__heading {
+  flex: 1;
+  gap: 24px;
   min-width: 0;
-  overflow-wrap: anywhere;
+}
+
+.ticket-info-section__label {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 28px;
+  white-space: nowrap;
+}
+
+.ticket-info-section__title {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 28px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ticket-overview__actions {
@@ -2675,7 +2695,7 @@ export default {
   width: fit-content;
   min-height: 24px;
   padding: 2px 10px;
-  border-radius: 12px;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 500;
   line-height: 20px;
@@ -2858,6 +2878,10 @@ export default {
   overflow-wrap: anywhere;
 }
 
+.ticket-overview__secondary-grid > .ticket-meta-item:not(.ticket-meta-item--description) > span:last-child {
+  white-space: nowrap;
+}
+
 .ticket-meta-item--description :deep(.ivu-tooltip-rel) {
   display: block;
   max-width: 100%;
@@ -2881,23 +2905,41 @@ export default {
 .ticket-progress-scroll {
   width: 100%;
   overflow-x: auto;
-  scrollbar-width: none;
+  padding-bottom: 4px;
+  scrollbar-color: var(--border-primary) transparent;
+  scrollbar-width: thin;
 }
 
 .ticket-progress-scroll::-webkit-scrollbar {
-  display: none;
+  height: 6px;
+}
+
+.ticket-progress-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ticket-progress-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--border-primary);
 }
 
 .ticket-progress {
+  --ticket-progress-icon-size: clamp(26px, 2.6cqw, 32px);
+  --ticket-progress-content-width: clamp(104px, 11.5cqw, 140px);
+  --ticket-progress-step-gap: clamp(6px, 0.8cqw, 10px);
+  --ticket-progress-connector-width: clamp(16px, 3cqw, 36px);
+  --ticket-progress-connector-gap: clamp(4px, 0.8cqw, 12px);
+
   position: relative;
   align-items: flex-start;
-  min-width: 960px;
+  width: 100%;
+  min-width: 840px;
 }
 
 .ticket-progress-step {
   position: relative;
   flex: none;
-  gap: 10px;
+  gap: var(--ticket-progress-step-gap);
   min-width: 0;
   padding: 3px 0;
   border: 0;
@@ -2931,12 +2973,12 @@ export default {
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: var(--ticket-progress-icon-size);
+  height: var(--ticket-progress-icon-size);
   border-radius: 50%;
   color: var(--text-tertiary);
   background: var(--bg-tertiary);
-  font-size: 17px;
+  font-size: clamp(15px, 1.4cqw, 17px);
   transition: transform 0.15s ease;
 }
 
@@ -2960,14 +3002,14 @@ export default {
   flex-direction: column;
   align-items: flex-start;
   gap: 3px;
-  width: 140px;
-  min-width: 140px;
+  width: var(--ticket-progress-content-width);
+  min-width: var(--ticket-progress-content-width);
   background: transparent;
 }
 
 .ticket-progress-step__content strong {
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: clamp(12px, 1.15cqw, 14px);
   font-weight: 600;
 }
 
@@ -2976,7 +3018,7 @@ export default {
   max-width: 100%;
   overflow: hidden;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: clamp(11px, 1cqw, 12px);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2986,10 +3028,10 @@ export default {
 }
 
 .ticket-progress-connector {
-  flex: 1 1 48px;
-  min-width: 36px;
+  flex: 1 1 var(--ticket-progress-connector-width);
+  min-width: var(--ticket-progress-connector-width);
   height: 2px;
-  margin: 18px 12px 0;
+  margin: calc(var(--ticket-progress-icon-size) / 2 + 2px) var(--ticket-progress-connector-gap) 0;
   border-radius: 1px;
   background: var(--border-primary);
 }
@@ -3187,7 +3229,7 @@ export default {
   align-items: center;
   min-height: 24px;
   padding: 2px 8px;
-  border-radius: 6px;
+  border-radius: 999px;
   color: var(--text-secondary);
   background: var(--bg-secondary);
   font-size: 12px;
@@ -3556,9 +3598,9 @@ export default {
   color: var(--error-color);
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1365px) {
   .ticket-overview__primary-grid,
-  .ticket-overview__primary-grid--with-target-database {
+  .ticket-overview__primary-grid.ticket-overview__primary-grid--with-target-database {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     row-gap: 22px;
   }
@@ -3568,19 +3610,20 @@ export default {
     border-left: 0;
   }
 
-  .ticket-overview__secondary-grid {
+  .ticket-overview__secondary-grid,
+  .ticket-overview__secondary-grid.ticket-overview__secondary-grid--with-target-database {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     row-gap: 22px;
   }
 
   .ticket-overview__secondary-grid .ticket-meta-item--description {
-    grid-column: 1 / -1;
+    grid-column: 1 / span 2;
     padding-left: 0;
     border-left: 0;
   }
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1279px) {
   .ticket-step-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3600,7 +3643,7 @@ export default {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 1079px) {
   .ticket-detail-page .ticket-detail-container {
     gap: 20px;
     padding: 12px 16px 20px;
@@ -3623,12 +3666,18 @@ export default {
     flex-direction: column;
   }
 
+  .ticket-info-section__heading {
+    width: 100%;
+  }
+
   .ticket-overview__actions {
     justify-content: flex-start;
   }
 
   .ticket-overview__primary-grid,
+  .ticket-overview__primary-grid.ticket-overview__primary-grid--with-target-database,
   .ticket-overview__secondary-grid,
+  .ticket-overview__secondary-grid.ticket-overview__secondary-grid--with-target-database,
   .ticket-step-summary,
   .ticket-activity-row {
     grid-template-columns: 1fr;
@@ -3668,10 +3717,6 @@ export default {
   .ticket-overview__secondary-grid .ticket-meta-item:first-child {
     padding-top: 0;
     border-top: 0;
-  }
-
-  .ticket-progress {
-    min-width: 900px;
   }
 
   .analysis-summary-row {
@@ -3719,6 +3764,19 @@ export default {
 
   .ticket-auth-record__permissions-title {
     padding-top: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .ticket-detail-page .ticket-detail-container {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .ticket-info-section__heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
   }
 }
 

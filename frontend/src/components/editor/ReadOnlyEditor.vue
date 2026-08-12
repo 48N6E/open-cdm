@@ -3,7 +3,7 @@ import * as monaco from 'monaco-editor';
 import { markRaw } from 'vue';
 import { mapState } from 'vuex';
 import { applySqlEditorLanguage, resolveSqlEditorLanguage } from './sqlLanguage';
-import { SQL_CHANGE_EDITOR_TYPOGRAPHY } from './sqlEditorTypography';
+import { SQL_EDITOR_SCROLLBAR, SQL_EDITOR_TYPOGRAPHY } from './sqlEditorTypography';
 
 const DEFAULT_LINE_HEIGHT = 22;
 const DEFAULT_VERTICAL_PADDING = 25;
@@ -19,26 +19,6 @@ export default {
     language: {
       type: String,
       default: 'sql'
-    },
-    fontFamily: {
-      type: String,
-      default: SQL_CHANGE_EDITOR_TYPOGRAPHY.fontFamily
-    },
-    fontSize: {
-      type: Number,
-      default: SQL_CHANGE_EDITOR_TYPOGRAPHY.fontSize
-    },
-    fontWeight: {
-      type: [Number, String],
-      default: 'bold'
-    },
-    lineHeight: {
-      type: Number,
-      default: SQL_CHANGE_EDITOR_TYPOGRAPHY.lineHeight
-    },
-    letterSpacing: {
-      type: Number,
-      default: SQL_CHANGE_EDITOR_TYPOGRAPHY.letterSpacing
     },
     dsType: {
       type: String,
@@ -144,11 +124,7 @@ export default {
             monaco.editor.create(this.$refs.readOnlyEditor, {
               value: this.text, // The editor 's value
               language,
-              fontFamily: this.fontFamily,
-              fontSize: this.fontSize,
-              fontWeight: String(this.fontWeight),
-              lineHeight: this.lineHeight,
-              letterSpacing: this.letterSpacing,
+              ...SQL_EDITOR_TYPOGRAPHY,
               scrollBeyondLastLine: false,
               readOnly: true,
               domReadOnly: true,
@@ -163,9 +139,8 @@ export default {
               },
               lineNumbers: this.lineNumberOption(),
               scrollbar: {
+                ...SQL_EDITOR_SCROLLBAR,
                 vertical: this.virtualScrollMode ? 'hidden' : 'auto',
-                verticalScrollbarSize: 5,
-                horizontalScrollbarSize: 8,
                 handleMouseWheel: !this.virtualScrollMode,
                 alwaysConsumeMouseWheel: !this.virtualScrollMode
               },
@@ -221,9 +196,8 @@ export default {
     updateScrollbarMode(virtualScrollMode) {
       this.monacoEditor?.updateOptions({
         scrollbar: {
+          ...SQL_EDITOR_SCROLLBAR,
           vertical: virtualScrollMode ? 'hidden' : 'auto',
-          verticalScrollbarSize: 5,
-          horizontalScrollbarSize: 8,
           handleMouseWheel: !virtualScrollMode,
           alwaysConsumeMouseWheel: !virtualScrollMode
         }
@@ -294,15 +268,5 @@ export default {
 
 :deep(.below) {
   display: none;
-}
-
-:deep(.monaco-scrollable-element > .scrollbar) {
-  border-radius: 1em;
-  background-color: rgba(50, 50, 50, 0.1);
-}
-
-:deep(.monaco-scrollable-element > .scrollbar > .slider) {
-  border-radius: 1em;
-  background-color: rgba(50, 50, 50, 0.3) !important;
 }
 </style>
