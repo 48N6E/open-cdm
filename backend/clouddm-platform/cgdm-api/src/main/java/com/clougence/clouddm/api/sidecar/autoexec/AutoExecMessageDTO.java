@@ -58,21 +58,23 @@ public class AutoExecMessageDTO {
         return dto;
     }
 
-    public static AutoExecMessageDTO taskFinishMessage(String queryId, Long affectLine, int execCount) {
+    public static AutoExecMessageDTO taskFinishMessage(String queryId, Long affectLine, int execCount, String message) {
         AutoExecMessageDTO dto = new AutoExecMessageDTO();
         dto.setType(AutoExecMessageType.TASK_FINISH);
         dto.setQueryId(queryId);
         dto.setAffectLine(affectLine);
         dto.setExecCount(execCount);
+        dto.setMessage(message);
         return dto;
     }
 
-    public static AutoExecMessageDTO taskWaitConfirmMessage(String queryId, Long affectLine, int execCount) {
+    public static AutoExecMessageDTO taskWaitConfirmMessage(String queryId, Long affectLine, int execCount, String message) {
         AutoExecMessageDTO dto = new AutoExecMessageDTO();
         dto.setType(AutoExecMessageType.TASK_WAIT_CONFIRM);
         dto.setAffectLine(affectLine);
         dto.setQueryId(queryId);
         dto.setExecCount(execCount);
+        dto.setMessage(message);
         return dto;
     }
 

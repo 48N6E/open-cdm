@@ -652,10 +652,18 @@
       </template>
     </CCModal>
     <CCModal v-model="showAutoExecJobLogModal" :title="$t('ri-zhi')" @ok="handleCloseModal" :width="800">
-      <Table :columns="autoExecJobLogColumns" :data="autoExecJobLogList" border size="small" />
+      <Table :columns="autoExecJobLogColumns" :data="autoExecJobLogList" border size="small">
+        <template #content="{ row }">
+          <pre class="ticket-exec-log-content">{{ row.content }}</pre>
+        </template>
+      </Table>
     </CCModal>
     <CCModal v-model="showAutoExecTaskLogModal" :title="$t('ri-zhi')" @ok="handleCloseModal" :width="800">
-      <Table :columns="autoExecJobLogColumns" :data="autoExecTaskLogList" border size="small" />
+      <Table :columns="autoExecJobLogColumns" :data="autoExecTaskLogList" border size="small">
+        <template #content="{ row }">
+          <pre class="ticket-exec-log-content">{{ row.content }}</pre>
+        </template>
+      </Table>
     </CCModal>
     <CCModal v-model="showAutoExecTaskSQLModal" :title="$t('sql-yu-ju')" width="80vw" centered :draggable="false" class="responsive-sql-modal">
       <div class="responsive-sql-modal-editor">
@@ -823,7 +831,7 @@ export default {
         },
         {
           title: '内容',
-          key: 'content'
+          slot: 'content'
         }
       ],
       autoExecJobLogList: [],
@@ -3449,6 +3457,19 @@ export default {
 .ticket-execution-table :deep(.ivu-btn-text:hover) {
   color: var(--primary-color);
   background: transparent;
+}
+
+.ticket-exec-log-content {
+  margin: 0;
+  font-family: Menlo, Monaco, 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+  letter-spacing: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 360px;
+  overflow: auto;
 }
 
 .ticket-execution-pagination {

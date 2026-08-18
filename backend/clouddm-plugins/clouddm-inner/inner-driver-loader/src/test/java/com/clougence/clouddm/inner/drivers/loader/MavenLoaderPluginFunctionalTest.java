@@ -93,13 +93,16 @@ public class MavenLoaderPluginFunctionalTest {
         Path jarPath = this.tempDir.resolve("plugin-driver").resolve("1.0.0").resolve("demo-artifact-1.0.0.jar");
         Path dependencyPath = this.tempDir.resolve("plugin-driver").resolve("1.0.0").resolve("demo-dependency-1.0.0.jar");
         Path testDependencyPath = this.tempDir.resolve("plugin-driver").resolve("1.0.0").resolve("demo-test-dependency-1.0.0.jar");
+        Path optionalDependencyPath = this.tempDir.resolve("plugin-driver").resolve("1.0.0").resolve("demo-optional-dependency-1.0.0.jar");
         assertTrue(Files.exists(jarPath));
         assertTrue(Files.exists(dependencyPath));
         assertFalse(Files.exists(testDependencyPath));
+        assertFalse(Files.exists(optionalDependencyPath));
         assertEquals(2, missingVersion.getFiles().size());
         assertTrue(missingVersion.getFiles().stream().anyMatch(file -> "demo-artifact-1.0.0.jar".equals(file.getRelativePath())));
         assertTrue(missingVersion.getFiles().stream().anyMatch(file -> "demo-dependency-1.0.0.jar".equals(file.getRelativePath())));
         assertTrue(missingVersion.getFiles().stream().noneMatch(file -> "demo-test-dependency-1.0.0.jar".equals(file.getRelativePath())));
+        assertTrue(missingVersion.getFiles().stream().noneMatch(file -> "demo-optional-dependency-1.0.0.jar".equals(file.getRelativePath())));
         assertEquals(1, progress.started.size());
         assertEquals(1, progress.completed.size());
         assertTrue(progress.errors.isEmpty());
@@ -290,7 +293,8 @@ public class MavenLoaderPluginFunctionalTest {
                      + "<groupId>com.example</groupId>" + "<artifactId>demo-artifact</artifactId>" + "<version>1.0.0</version>" + "<dependencies>" + "<dependency>"
                      + "<groupId>com.example</groupId>" + "<artifactId>demo-dependency</artifactId>" + "<version>1.0.0</version>" + "</dependency>" + "<dependency>"
                      + "<groupId>com.example</groupId>" + "<artifactId>demo-test-dependency</artifactId>" + "<version>1.0.0</version>" + "<scope>test</scope>"
-                     + "</dependency>" + "</dependencies>"
+                     + "</dependency>" + "<dependency>" + "<groupId>com.example</groupId>" + "<artifactId>demo-optional-dependency</artifactId>"
+                     + "<version>1.0.0</version>" + "<optional>true</optional>" + "</dependency>" + "</dependencies>"
                      + "</project>";
         return pom.getBytes(StandardCharsets.UTF_8);
     }

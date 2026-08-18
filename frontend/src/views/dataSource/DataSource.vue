@@ -1003,6 +1003,7 @@ export default {
               this.accountInfo.clientSecurityFile = this.accountInfo.tlsKeystoreFile;
               break;
             case 'PostgreSQL':
+            case 'CockroachDB':
               datasourceUpdateData.secretFilePassword = this.accountInfo?.secretFilePassword || '';
               this.accountInfo.secretFile = this.accountInfo.clientSecretFile;
               break;
