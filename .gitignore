@@ -53,3 +53,16 @@ install_upgrade.log
 *.local.md
 
 .claude
+
+# local config and secrets
+*.local.yml
+*.local.yaml
+*.local.properties
+*.local.json
+.env.local
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+*.truststore
