@@ -40,6 +40,7 @@ import com.clougence.clouddm.platform.dal.model.monitor.DmMonBizLogDO;
 import com.clougence.clouddm.platform.dal.model.monitor.LogDependBizType;
 import com.clougence.clouddm.platform.dal.model.monitor.Loglevel;
 import com.clougence.utils.CollectionUtils;
+import com.clougence.utils.StringUtils;
 
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -259,6 +260,7 @@ public class ExecJobRServiceProvider extends AbstractBasicProvider implements Ex
         taskDO.setAffectRow(message.getAffectLine());
         taskDO.setGmtLastEnd(message.getTime());
         execDal.autoTaskMapper().updateById(taskDO);
+        this.writeTaskResultLog(taskDO, message.getMessage(), message.getAffectLine());
     }
 
     private void taskFinish(AutoExecMessageDTO dto) {
@@ -271,6 +273,16 @@ public class ExecJobRServiceProvider extends AbstractBasicProvider implements Ex
         taskDO.setAffectRow(dto.getAffectLine());
         taskDO.setGmtLastEnd(dto.getTime());
         execDal.autoTaskMapper().updateById(taskDO);
+        this.writeTaskResultLog(taskDO, dto.getMessage(), dto.getAffectLine());
+    }
+
+    private void writeTaskResultLog(DmExecAutoTaskDO taskDO, String echoText, long affectLine) {
+        String content = echoText;
+        if (StringUtils.isBlank(content)) {
+            content = DmI18nUtils.getMessage(I18nDmMsgKeys.AUTO_EXEC_TASK_FINISH_AFFECT_MESSAGE.name(), affectLine);
+        }
+        DmMonBizLogDO logDO = new DmMonBizLogDO(Loglevel.INFO, content, LogDependBizType.AUTO_EXEC_TASK, taskDO.getBizId());
+        monitorDal.bizLogMapper().insert(logDO);
     }
 
     private void taskFailed(AutoExecMessageDTO message) {

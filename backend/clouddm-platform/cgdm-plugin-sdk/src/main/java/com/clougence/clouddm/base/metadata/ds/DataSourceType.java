@@ -34,6 +34,7 @@ public enum DataSourceType {
     Oracle("ora", "Oracle", 0, 20),
     SQLServer("ms", "SQLServer", 0, 30),
     PostgreSQL("pg", "PostgreSQL", 0, 40),
+    CockroachDB("crdb", "CockroachDB", 0, 45),
     MariaDB("mar", "MariaDB", 0, 50),
     TiDB("ti", "TiDB", 0, 60),
     Dameng("dm", "Dameng", 0, 70),
@@ -59,6 +60,7 @@ public enum DataSourceType {
     // non-relational db
     Redis("re", "Redis", 2, 10),
     MongoDB("mdb", "MongoDB", 2, 20),
+    Kafka("ka", "Kafka", 2, 30),
 
     // cloud database
     AdbForMySQL("amy", "AdbForMySQL", 3, 10),

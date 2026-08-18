@@ -23,8 +23,4 @@
         <driverName>com.clougence.clouddm.dsfamily.postgres.execute.dsfactory.PostgresqlDsFactory</driverName>
         <resource type="maven">org.postgresql:postgresql:42.2.29</resource>
     </driver>
-    <driver driverFamily="PostgreSQL JDBC" version="42.1.4">
-        <driverName>com.clougence.clouddm.dsfamily.postgres.execute.dsfactory.PostgresqlDsFactory</driverName>
-        <resource type="maven">org.postgresql:postgresql:42.1.4</resource>
-    </driver>
 </drivers>

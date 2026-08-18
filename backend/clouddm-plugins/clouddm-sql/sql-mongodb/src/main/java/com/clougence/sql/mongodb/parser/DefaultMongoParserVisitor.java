@@ -303,6 +303,88 @@ public class DefaultMongoParserVisitor extends AbstractLocationParseTreeVisitor<
     }
 
     @Override
+    public Object visitReplicaSetFunction(MongoParser.ReplicaSetFunctionContext ctx) {
+        String method = ctx.replicaSetMethod().getText();
+        if ("status".equalsIgnoreCase(method) || "printSecondaryReplicationInfo".equalsIgnoreCase(method) || "printSlaveReplicationInfo".equalsIgnoreCase(method)) {
+            this.instStack.push(new MongoReadCommandFunc(MongoFuncType.RS_STATUS, "{\"replSetGetStatus\":1}", "admin"));
+            return null;
+        }
+        if ("conf".equalsIgnoreCase(method) || "config".equalsIgnoreCase(method)) {
+            this.instStack.push(new MongoReadCommandFunc(MongoFuncType.RS_CONF, "{\"replSetGetConfig\":1}", "admin"));
+            return null;
+        }
+        if ("hello".equalsIgnoreCase(method)) {
+            this.instStack.push(new HelloFunc());
+            return null;
+        }
+        if ("isMaster".equalsIgnoreCase(method) || "ismaster".equalsIgnoreCase(method)) {
+            this.instStack.push(new MongoReadCommandFunc(MongoFuncType.HELLO, "{\"isMaster\":1}", "admin"));
+            return null;
+        }
+        if ("printReplicationInfo".equalsIgnoreCase(method) || "getReplicationInfo".equalsIgnoreCase(method)) {
+            this.instStack.push(new MongoReadCommandFunc(MongoFuncType.RS_REPLICATION_INFO, "{\"collStats\":\"oplog.rs\"}", "local"));
+            return null;
+        }
+        if ("serverStatus".equalsIgnoreCase(method)) {
+            this.instStack.push(new ServerStatusFunc());
+            return null;
+        }
+        if ("hostInfo".equalsIgnoreCase(method)) {
+            this.instStack.push(new HostInfoFunc());
+            return null;
+        }
+        if ("serverBuildInfo".equalsIgnoreCase(method)) {
+            this.instStack.push(new BuildInfoFunc());
+            return null;
+        }
+        if ("getLogComponents".equalsIgnoreCase(method)) {
+            this.instStack.push(new GetLogComponentsFunc());
+            return null;
+        }
+        if ("getProfilingStatus".equalsIgnoreCase(method)) {
+            ProfileFunc func = new ProfileFunc();
+            func.setLevel("-1");
+            this.instStack.push(code(func, ctx));
+            return null;
+        }
+        if ("currentOp".equalsIgnoreCase(method)) {
+            CurrentOpFunc func = new CurrentOpFunc();
+            if (ctx.obj() != null) {
+                for (MongoParser.PairContext pair : ctx.obj().pair()) {
+                    func.addOption(getString(pair.key().getText()), pair.value().getText());
+                }
+            }
+            this.instStack.push(func);
+            return null;
+        }
+        throw new UnsupportedOperationException("Unsupported MongoDB func rs." + method);
+    }
+
+    @Override
+    public Object visitReplicaSetMethod(MongoParser.ReplicaSetMethodContext ctx) {
+        return null;
+    }
+
+    @Override
+    public Object visitShardingFunction(MongoParser.ShardingFunctionContext ctx) {
+        String method = ctx.shardingMethod().getText();
+        if ("status".equalsIgnoreCase(method) || "printShardingStatus".equalsIgnoreCase(method)) {
+            this.instStack.push(new MongoReadCommandFunc(MongoFuncType.SH_STATUS, "{\"listShards\":1}", "admin"));
+            return null;
+        }
+        if ("isBalancerRunning".equalsIgnoreCase(method) || "getBalancerState".equalsIgnoreCase(method)) {
+            this.instStack.push(new MongoReadCommandFunc(MongoFuncType.SH_BALANCER_STATUS, "{\"balancerStatus\":1}", "admin"));
+            return null;
+        }
+        throw new UnsupportedOperationException("Unsupported MongoDB func sh." + method);
+    }
+
+    @Override
+    public Object visitShardingMethod(MongoParser.ShardingMethodContext ctx) {
+        return null;
+    }
+
+    @Override
     public Object visitDbHello(MongoParser.DbHelloContext ctx) {
         this.instStack.push(new HelloFunc());
         return null;
