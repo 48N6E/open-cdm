@@ -263,4 +263,10 @@ const requestWebSocket = ({ type, responseType, object, timeout = DEFAULT_REQUES
     webSocketSend({ type, object });
   });
 
-export { createWebSocket, webSocketClose, sendWebSocket, requestWebSocket, hasWebSocketInstance };
+const setWebSocketCallback = (callback = {}) => {
+  globalCallback = callback;
+};
+
+const getWebSocketCallback = () => globalCallback;
+
+export { createWebSocket, webSocketClose, sendWebSocket, setWebSocketCallback, getWebSocketCallback, requestWebSocket, hasWebSocketInstance };

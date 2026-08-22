@@ -67,10 +67,16 @@ public class KafkaMetaProviderDm extends AbstractMetadataProvider implements Met
     }
 
     public List<Value> selectSchemas() {
-        RdbValue value = new RdbValue();
-        value.setUmiType(UmiTypes.Schema);
-        value.setValue(KafkaKeys.DEFAULT_SCHEMA);
-        return Collections.singletonList(value);
+        RdbValue topics = new RdbValue();
+        topics.setUmiType(UmiTypes.Schema);
+        topics.setValue(KafkaKeys.SCHEMA_TOPICS);
+        RdbValue groups = new RdbValue();
+        groups.setUmiType(UmiTypes.Schema);
+        groups.setValue(KafkaKeys.SCHEMA_GROUPS);
+        List<Value> result = new ArrayList<>();
+        result.add(topics);
+        result.add(groups);
+        return result;
     }
 
     public List<Value> selectTables() throws SQLException {
@@ -89,11 +95,31 @@ public class KafkaMetaProviderDm extends AbstractMetadataProvider implements Met
         }
     }
 
+    public List<Value> selectGroups() throws SQLException {
+        try (Connection conn = this.connectSupplier.eGet(); PreparedStatement ps = conn.prepareStatement("SHOW GROUPS")) {
+            try (ResultSet rs = ps.executeQuery()) {
+                List<Value> result = new ArrayList<>();
+                while (rs.next()) {
+                    RdbValue value = new RdbValue();
+                    value.setUmiType(UmiTypes.Table);
+                    value.setValue(rs.getString("GROUP_ID"));
+                    result.add(value);
+                }
+                result.sort((o1, o2) -> ((RdbValue) o1).getValue().compareTo(((RdbValue) o2).getValue()));
+                return result;
+            }
+        }
+    }
+
     public Value loadTable(String tableName) {
-        RdbValue value = new RdbValue();
-        value.setUmiType(UmiTypes.Table);
-        value.setValue(tableName);
-        return value;
+        return loadTable(KafkaKeys.SCHEMA_TOPICS, tableName);
+    }
+
+    public Value loadTable(String schema, String tableName) {
+        RdbTable rdbTable = new RdbTable();
+        rdbTable.setSchema(schema);
+        rdbTable.setName(tableName);
+        return rdbTable;
     }
 
     @Override

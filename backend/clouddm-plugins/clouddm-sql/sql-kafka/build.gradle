@@ -13,18 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.clougence.clouddm.ds.kafka.execute.jdbc;
 
-public enum KafkaCommandType {
+plugins {
+    id 'com.clougence.java-conventions'
+    id 'antlr'
+}
 
-    SHOW_TOPICS,
-    SHOW_GROUPS,
-    DESCRIBE_CLUSTER,
-    DESCRIBE_TOPIC,
-    DESCRIBE_TOPIC_INFO,
-    ALTER_TOPIC,
-    DESCRIBE_GROUP,
-    DELETE_GROUP,
-    ALTER_GROUP_RESET_OFFSET,
-    CONSUME
+dependencies {
+    antlr "org.antlr:antlr4:${ANTLR_VERSION}"
+    api "org.antlr:antlr4-runtime:${ANTLR_VERSION}"
+    api project(':cg-dslparser')
+    api project(':sqlc-common')
+}
+
+description = 'sql-kafka'
+
+tasks.named('generateGrammarSource') {
+    arguments += ['-visitor', '-package', 'com.clougence.sql.kafka.parser.antlr']
 }

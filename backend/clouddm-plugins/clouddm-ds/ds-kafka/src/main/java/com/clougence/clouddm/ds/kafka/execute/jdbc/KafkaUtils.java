@@ -42,6 +42,18 @@ class KafkaUtils {
     static final JdbcColumn TIMESTAMP = new JdbcColumn("TIMESTAMP", AdapterType.Long, "", "", "");
     static final JdbcColumn KEY       = new JdbcColumn("KEY", AdapterType.String, "", "", "");
     static final JdbcColumn MSG_VALUE = new JdbcColumn("VALUE", AdapterType.String, "", "", "");
+    static final JdbcColumn PROPERTY  = new JdbcColumn("PROPERTY", AdapterType.String, "", "", "");
+    static final JdbcColumn PARTITION_COUNT = new JdbcColumn("PARTITION_COUNT", AdapterType.Int, "", "", "");
+    static final JdbcColumn REPLICATION_FACTOR = new JdbcColumn("REPLICATION_FACTOR", AdapterType.Int, "", "", "");
+    static final JdbcColumn MIN_ISR = new JdbcColumn("MIN_ISR", AdapterType.Int, "", "", "");
+    static final JdbcColumn RETENTION_MS = new JdbcColumn("RETENTION_MS", AdapterType.Long, "", "", "");
+    static final JdbcColumn RETENTION_BYTES = new JdbcColumn("RETENTION_BYTES", AdapterType.Long, "", "", "");
+    static final JdbcColumn CLEANUP_POLICY = new JdbcColumn("CLEANUP_POLICY", AdapterType.String, "", "", "");
+    static final JdbcColumn AFFECTED = new JdbcColumn("AFFECTED", AdapterType.Int, "", "", "");
+    static final JdbcColumn CURRENT_OFFSET = new JdbcColumn("CURRENT_OFFSET", AdapterType.Long, "", "", "");
+    static final JdbcColumn LOG_END_OFFSET = new JdbcColumn("LOG_END_OFFSET", AdapterType.Long, "", "", "");
+    static final JdbcColumn LAG = new JdbcColumn("LAG", AdapterType.Long, "", "", "");
+    static final JdbcColumn MEMBER_COUNT = new JdbcColumn("MEMBER_COUNT", AdapterType.Int, "", "", "");
 
     static CgFuture<?> completed(CgFuture<Object> sync) {
         sync.completed(true);

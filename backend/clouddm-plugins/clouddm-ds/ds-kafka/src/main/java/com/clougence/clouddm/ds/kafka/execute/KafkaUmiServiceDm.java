@@ -22,6 +22,7 @@ import java.util.Map;
 
 import com.clougence.clouddm.dsfamily.execute.AbstractRdbUmiService;
 import com.clougence.schema.umi.service.RdbUmiServiceDm;
+import com.clougence.clouddm.ds.kafka.execute.jdbc.KafkaKeys;
 import com.clougence.schema.umi.struts.UmiTypes;
 import com.clougence.schema.umi.struts.Value;
 import com.clougence.utils.StringUtils;
@@ -43,6 +44,10 @@ public class KafkaUmiServiceDm extends AbstractRdbUmiService<KafkaMetaProviderDm
     @Override
     public List<Value> listLeaf(Map<UmiTypes, Object> levelsParam, UmiTypes leafType, String pattern) throws SQLException {
         if (leafType == UmiTypes.Table) {
+            String schema = levelsParam == null ? null : StringUtils.toString(levelsParam.get(UmiTypes.Schema));
+            if (KafkaKeys.isGroupsSchema(schema)) {
+                return this.metadataSupplier.eGet().selectGroups();
+            }
             return this.metadataSupplier.eGet().selectTables();
         }
         throw new UnsupportedOperationException("listLeaf of " + leafType + " Unsupported.");
@@ -51,7 +56,11 @@ public class KafkaUmiServiceDm extends AbstractRdbUmiService<KafkaMetaProviderDm
     @Override
     public Value detailLeaf(Map<UmiTypes, Object> levelsParam, UmiTypes leafType, String leafName) throws SQLException {
         if (leafType == UmiTypes.Table) {
-            return this.metadataSupplier.eGet().loadTable(leafName);
+            String schema = levelsParam == null ? null : StringUtils.toString(levelsParam.get(UmiTypes.Schema));
+            if (KafkaKeys.isGroupsSchema(schema)) {
+                return this.metadataSupplier.eGet().loadTable(KafkaKeys.SCHEMA_GROUPS, leafName);
+            }
+            return this.metadataSupplier.eGet().loadTable(KafkaKeys.SCHEMA_TOPICS, leafName);
         }
         throw new UnsupportedOperationException("detailLeaf of " + leafType + " Unsupported.");
     }

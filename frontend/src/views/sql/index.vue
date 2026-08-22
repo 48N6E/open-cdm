@@ -103,42 +103,48 @@
                   :rdb-object-detail="rdbObjectDetail"
                 />
                 <div class="query-editor-container">
-                  <div class="layout-content-main">
-                    <SqlViewer
-                      ref="sqlViewer"
-                      :handleGetDsSetting="handleGetDsSetting"
-                      :createSession="createSession"
-                      :storeQueryTabs="storeQueryTabs"
-                      :tab="currentTab"
-                      :tabs="tabs"
-                      :completion-data="completionData"
-                      :rdb-object-detail="rdbObjectDetail"
-                      :handle-click-ds-status-icon="handleClickDsStatusIcon"
-                    >
-                      <template #connection-context>
-                        <div class="query-schema-select__content">
-                          <a-select
-                            v-if="currentTab.selectOptions"
-                            class="schema-select-style"
-                            v-model:value="currentTab.selectValue"
-                            show-search
-                            size="small"
-                            :options="currentTab.selectOptions || []"
-                            @select="handleChangeSchema"
-                          ></a-select>
-                          <CustomIcon
-                            class="query-connection-icon"
-                            :type="currentTab.dsType"
-                            :instance-type="currentTab.node.INSTANCE.attr.dsDeployType"
-                            size="14px"
-                            aria-hidden="true"
-                          />
-                          <div class="query-connection-label">@{{ currentTab.node.INSTANCE.attr.dsHost }}</div>
-                        </div>
-                      </template>
-                    </SqlViewer>
-                  </div>
-                  <div ref="result" class="result-wrapper">
+                  <SqlViewer
+                    ref="sqlViewer"
+                    v-show="currentTab.dsType !== 'Kafka'"
+                    class="layout-content-main"
+                    :handleGetDsSetting="handleGetDsSetting"
+                    :createSession="createSession"
+                    :storeQueryTabs="storeQueryTabs"
+                    :tab="currentTab"
+                    :tabs="tabs"
+                    :completion-data="completionData"
+                    :rdb-object-detail="rdbObjectDetail"
+                    :handle-click-ds-status-icon="handleClickDsStatusIcon"
+                  >
+                    <template #connection-context>
+                      <div class="query-schema-select__content">
+                        <a-select
+                          v-if="currentTab.selectOptions"
+                          class="schema-select-style"
+                          v-model:value="currentTab.selectValue"
+                          show-search
+                          size="small"
+                          :options="currentTab.selectOptions || []"
+                          @select="handleChangeSchema"
+                        ></a-select>
+                        <CustomIcon
+                          class="query-connection-icon"
+                          :type="currentTab.dsType"
+                          :instance-type="currentTab.node.INSTANCE.attr.dsDeployType"
+                          size="14px"
+                          aria-hidden="true"
+                        />
+                        <div class="query-connection-label">@{{ currentTab.node.INSTANCE.attr.dsHost }}</div>
+                      </div>
+                    </template>
+                  </SqlViewer>
+                  <KafkaWorkspace
+                    v-if="currentTab.dsType === 'Kafka'"
+                    :tab="currentTab"
+                    :execute-query="executeKafkaQuery"
+                    :create-session="createSession"
+                  />
+                  <div ref="result" class="result-wrapper" v-show="currentTab.dsType !== 'Kafka'">
                     <Result :id="`result_${currentTab.key}`" :ref="`result_`" :resultList="currentTab.resultList" :tab="currentTab" />
                   </div>
                 </div>
@@ -199,11 +205,12 @@ import LuckySheetDataView from '@/views/sql/components/LuckySheetDataView';
 import browseMixin from '@/mixins/browseMixin';
 import { UPDATE_EDITOR_SET } from '@/store/mutationTypes';
 import { ASYNC_TASK_STATUS, SOCKET_TYPE, hasSchema, noStruct, WS_REQ_QUERY_TYPE, WS_TYPE } from '@/utils';
-import { sendWebSocket } from '@/services/socket';
+import { getWebSocketCallback, sendWebSocket, setWebSocketCallback } from '@/services/socket';
 import sqlMixin from '@/mixins/sqlMixin';
 import { EVENT_BUS_NAME_LIST } from '@/utils/eventBusName';
 import { nanoid } from 'nanoid';
 import { TabManager } from '@/views/sql/tabManager';
+import KafkaWorkspace from '@/views/sql/components/kafka/KafkaWorkspace.vue';
 import CustomIcon from '@/components/function/CustomIcon.vue';
 import ContextMenu from '@imengyu/vue3-context-menu';
 import { DoubleRightOutlined } from '@ant-design/icons-vue';
@@ -224,6 +231,7 @@ export default {
   name: 'Sql',
   mixins: [browseMixin, sqlMixin],
   components: {
+    KafkaWorkspace,
     CustomIcon,
     DoubleRightOutlined,
     LuckySheetDataView,
@@ -485,20 +493,22 @@ export default {
               preLevels.forEach((levelKey) => {
                 leaf[levelKey] = node[levelKey];
               });
+              const levelId = objId === '-1' ? objName : objId;
+              const displayTitle = this.kafkaSchemaTitle(node, objType, objName);
               Object.assign(leaf, {
                 [objType]: {
-                  id: objId === '-1' ? objName : objId,
+                  id: levelId,
                   name: objName,
                   attr: objAttr
                 },
                 icon: objType === 'INSTANCE' ? objAttr.dsType : objType,
                 isLeaf: false,
-                selected: params.selected === `${node.key}.\`${objId === '-1' ? objName : objId}\``,
-                title: objName,
+                selected: params.selected === `${node.key}.\`${levelId}\``,
+                title: displayTitle,
                 popTip: `${node.popTip}.${objName}`,
                 parentKey: node.key,
                 parentPoptip: node.popTip,
-                key: `${node.key}.\`${objId === '-1' ? objName : objId}\``,
+                key: `${node.key}.\`${levelId}\``,
                 children: [],
                 nodeType: objType,
                 levels: [...preLevels, objType]
@@ -964,6 +974,18 @@ export default {
         .filter((child) => child && typeof child === 'object' && child.title)
         .map((child) => ({ value: child.title, label: prefix + child.title }));
     },
+    kafkaSchemaTitle(parentNode, objType, objName) {
+      if (objType !== 'SCHEMA' || parentNode?.INSTANCE?.attr?.dsType !== 'Kafka') {
+        return objName;
+      }
+      if (objName === 'Topics') {
+        return this.$t('kafka-schema-topics');
+      }
+      if (objName === 'groups' || objName === 'Consumer Groups') {
+        return this.$t('kafka-schema-groups');
+      }
+      return objName;
+    },
     refreshTabSelectOptions(key) {
       const node = this.$refs.dataSourceTree.handleGetNode(key);
       if (node.key && node._parent && node._parent.children) {
@@ -1405,6 +1427,124 @@ export default {
     },
     handleQueryTable(text) {
       this.$refs.sqlViewer.setSql(text);
+    },
+    executeKafkaQuery(tab, queryString) {
+      if (!tab.sessionId) {
+        return Promise.reject(new Error(this.$t('kafka-topic-load-failed')));
+      }
+      const sessionId = tab.sessionId;
+      const previousCallback = getWebSocketCallback();
+
+      return new Promise((resolve, reject) => {
+        let columnList = null;
+        const rows = [];
+        let errorMessage = null;
+        let finished = false;
+
+        const finish = (timedOut = false) => {
+          if (finished) {
+            return;
+          }
+          finished = true;
+          window.clearTimeout(timeoutId);
+          tab.running = false;
+          setWebSocketCallback(previousCallback);
+          if (timedOut) {
+            reject(new Error('timeout'));
+            return;
+          }
+          if (errorMessage) {
+            reject(new Error(errorMessage));
+            return;
+          }
+          resolve(rows);
+        };
+
+        const timeoutId = window.setTimeout(() => {
+          finish(true);
+        }, 60000);
+
+        const onMessage = (data) => {
+          let queryData;
+          try {
+            queryData = JSON.parse(data);
+          } catch (error) {
+            return;
+          }
+          if (queryData.type && queryData.type !== WS_TYPE.WS_RES_QUERY) {
+            if (previousCallback.message) {
+              previousCallback.message(data);
+            }
+            return;
+          }
+          if (queryData.object?.sessionId && queryData.object.sessionId !== sessionId) {
+            if (previousCallback.message) {
+              previousCallback.message(data);
+            }
+            return;
+          }
+
+          const resultType = queryData.object?.resultType;
+          if (resultType === 'ResultSetMeta') {
+            columnList = (queryData.object.columnList || []).map((item) => {
+              if (typeof item === 'string') {
+                return item;
+              }
+              return item?.name || item?.field || item?.title || String(item);
+            });
+          }
+          if (resultType === 'ResultSet') {
+            const { rowSet } = queryData.object;
+            if (rowSet && columnList) {
+              rowSet.forEach((item) => {
+                const currentRow = {};
+                const rowData = item.data || item.row;
+                if (rowData) {
+                  for (let i = 0; i < columnList.length; i++) {
+                    const cell = rowData[i];
+                    if (cell == null) {
+                      continue;
+                    }
+                    currentRow[columnList[i]] = Object.prototype.hasOwnProperty.call(cell, 'value') ? cell.value : cell;
+                  }
+                }
+                rows.push(currentRow);
+              });
+            }
+          }
+          if (resultType === 'Message') {
+            const entity = queryData.object.entities?.[0];
+            if (entity?.level === 'Error' && entity?.message) {
+              errorMessage = entity.message;
+            }
+          }
+          if (resultType === 'Done') {
+            finish();
+          }
+        };
+
+        tab.running = true;
+        sendWebSocket(
+          {
+            type: WS_TYPE.WS_REQ_QUERY,
+            object: {
+              force: true,
+              basicCodeLine: 1,
+              basicCodeColumn: 1,
+              queryString,
+              queryArgs: [],
+              sessionId,
+              queryType: WS_REQ_QUERY_TYPE.REQUEST_QUERY,
+              levels: this.browseGenLevelsData(tab.node),
+              rdbAutoCommit: tab.autoCommit,
+              rdbReadOnly: tab.readOnly,
+              rdbIsolation: tab.isolation,
+              receiveMode: 'PAGE_FULL'
+            }
+          },
+          { message: onMessage }
+        );
+      });
     },
     disableAddTab() {
       if (this.tabs.length >= 20) {

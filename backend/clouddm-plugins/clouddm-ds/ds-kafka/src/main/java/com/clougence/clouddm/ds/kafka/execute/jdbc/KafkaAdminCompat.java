@@ -20,12 +20,16 @@ import java.lang.reflect.Method;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.OffsetSpec;
 import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
 
 class KafkaAdminCompat {
 
@@ -51,6 +55,68 @@ class KafkaAdminCompat {
         return (Collection<?>) await(all, timeout, unit);
     }
 
+    static Object describeGroup(AdminClient admin, String groupId, long timeout, TimeUnit unit) throws Exception {
+        Object result = invoke(admin.getClass().getMethod("describeConsumerGroups", Collection.class), admin, Collections.singletonList(groupId));
+        Object allFuture = invoke(result.getClass().getMethod("all"), result);
+        Map<?, ?> values = (Map<?, ?>) await(allFuture, timeout, unit);
+        Object group = values.get(groupId);
+        if (group == null) {
+            throw new SQLException("consumer group not found: " + groupId);
+        }
+        return group;
+    }
+
+    @SuppressWarnings("unchecked")
+    static Map<TopicPartition, OffsetAndMetadata> listGroupOffsets(AdminClient admin, String groupId, long timeout, TimeUnit unit) throws Exception {
+        Method byGroup = findMethod(admin.getClass(), "listConsumerGroupOffsets", String.class);
+        if (byGroup != null) {
+            Object result = invoke(byGroup, admin, groupId);
+            Object future = invoke(result.getClass().getMethod("partitionsToOffsetAndMetadata"), result);
+            return (Map<TopicPartition, OffsetAndMetadata>) await(future, timeout, unit);
+        }
+        throw new SQLException("listConsumerGroupOffsets is not supported by current Kafka client.");
+    }
+
+    static void deleteGroup(AdminClient admin, String groupId, long timeout, TimeUnit unit) throws Exception {
+        Object result = invoke(admin.getClass().getMethod("deleteConsumerGroups", Collection.class), admin, Collections.singletonList(groupId));
+        await(invoke(result.getClass().getMethod("all"), result), timeout, unit);
+    }
+
+    static void alterGroupOffsets(AdminClient admin, String groupId, Map<TopicPartition, OffsetAndMetadata> offsets, long timeout, TimeUnit unit) throws Exception {
+        Object result = invoke(admin.getClass().getMethod("alterConsumerGroupOffsets", String.class, Map.class), admin, groupId, offsets);
+        await(invoke(result.getClass().getMethod("all"), result), timeout, unit);
+    }
+
+    @SuppressWarnings("unchecked")
+    static Map<TopicPartition, Object> listOffsets(AdminClient admin, Map<TopicPartition, OffsetSpec> specs, long timeout, TimeUnit unit) throws Exception {
+        Object result = invoke(admin.getClass().getMethod("listOffsets", Map.class), admin, specs);
+        Object future = invoke(result.getClass().getMethod("all"), result);
+        return (Map<TopicPartition, Object>) await(future, timeout, unit);
+    }
+
+    static long listOffsetValue(Object listOffsetsResultInfo) throws Exception {
+        Object offset = invoke(listOffsetsResultInfo.getClass().getMethod("offset"), listOffsetsResultInfo);
+        return ((Number) offset).longValue();
+    }
+
+    static String groupState(Object description) {
+        try {
+            Object state = invoke(description.getClass().getMethod("state"), description);
+            return state == null ? "" : String.valueOf(state);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    static int groupMembers(Object description) {
+        try {
+            Collection<?> members = (Collection<?>) invoke(description.getClass().getMethod("members"), description);
+            return members == null ? 0 : members.size();
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     static String listingId(Object listing) throws Exception {
         return String.valueOf(invoke(listing.getClass().getMethod("groupId"), listing));
     }
@@ -72,6 +138,14 @@ class KafkaAdminCompat {
         } catch (Exception e) {
             return "";
         }
+    }
+
+    static Map<TopicPartition, OffsetSpec> offsetSpecs(Collection<TopicPartition> partitions, OffsetSpec spec) {
+        Map<TopicPartition, OffsetSpec> specs = new LinkedHashMap<>();
+        for (TopicPartition partition : partitions) {
+            specs.put(partition, spec);
+        }
+        return specs;
     }
 
     private static Object describeTopics(AdminClient admin, String topic) throws Exception {

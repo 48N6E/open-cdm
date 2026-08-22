@@ -27,11 +27,11 @@ public class KafkaCmdTemplateSpi extends AbstractCmdTemplateSpi {
 
     @Override
     public String getQuickQuery(CmdTemplateOption option) {
-        return "CONSUME " + TABLE_PLACEHOLDER + " FROM BEGINNING LIMIT 20";
+        return "";
     }
 
     @Override
     public String getQuickQueryByTable(CmdTemplateOption option) {
-        return this.getQuickQuery(option);
+        return "";
     }
 }

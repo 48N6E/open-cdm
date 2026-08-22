@@ -124,9 +124,11 @@ class KafkaClientProps {
     private static String clientName(Map<String, String> dsConfig) {
         String name = StringUtils.trimToNull(dsConfig.get(KafkaKeys.CLIENT_NAME));
         if (name == null) {
-            return KafkaKeys.DEFAULT_CLIENT_NAME;
+            name = KafkaKeys.DEFAULT_CLIENT_NAME;
+        } else {
+            name = name.replace(" ", "-");
         }
-        return name.replace(" ", "-");
+        return name + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
     private static SslMode sslMode(String value) {
