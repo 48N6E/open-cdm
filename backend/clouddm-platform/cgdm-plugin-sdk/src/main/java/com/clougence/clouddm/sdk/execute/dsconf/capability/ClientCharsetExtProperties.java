@@ -13,21 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.clougence.clouddm.console.web.model.fo.editor.query;
-
-import lombok.Getter;
-import lombok.Setter;
+package com.clougence.clouddm.sdk.execute.dsconf.capability;
 
 /**
- * @author mode 2021/1/16 16:36
+ * Extended datasource properties for specifying a client character set.
  */
-@Getter
-@Setter
-public class DownloadResultFO {
+public interface ClientCharsetExtProperties {
 
-    private String resultId;
-    private String downloadFileName;
+    String CLIENT_CHARSET_FIELD = "clientCharset";
 
-    // private boolean compress;
-    // private String  compressFormat;
+    String getClientCharset();
 }

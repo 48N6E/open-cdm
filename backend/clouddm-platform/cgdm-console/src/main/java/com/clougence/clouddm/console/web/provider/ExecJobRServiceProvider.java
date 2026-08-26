@@ -16,6 +16,7 @@
 package com.clougence.clouddm.console.web.provider;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 import org.springframework.stereotype.Service;
@@ -173,8 +174,8 @@ public class ExecJobRServiceProvider extends AbstractBasicProvider implements Ex
             return;
         }
 
-        String msg = DmI18nUtils.getMessage(I18nDmMsgKeys.AUTO_EXEC_TRANSACTION_SKIP_MESSAGE.name(), taskDO.getExecOrder(), taskDO.getExecSql());
-        this.jobLog(Loglevel.WARING, msg, dto.getJobId());
+        this.jobLog(Loglevel.WARING, I18nDmMsgKeys.AUTO_EXEC_TRANSACTION_SKIP_MESSAGE, dto.getJobId(),
+                taskDO.getExecOrder(), taskDO.getExecSql());
     }
 
     private void jobPause(AutoExecMessageDTO dto) {
@@ -185,7 +186,7 @@ public class ExecJobRServiceProvider extends AbstractBasicProvider implements Ex
         if (this.execDal.autoJobMapper().pauseJobIfActive(dto.getJobId()) == 0) {
             return;
         }
-        this.jobLog(Loglevel.INFO, DmI18nUtils.getMessage(I18nDmMsgKeys.AUTO_EXEC_JOB_PAUSE_MESSAGE.name()), dto.getJobId());
+        this.jobLog(Loglevel.INFO, I18nDmMsgKeys.AUTO_EXEC_JOB_PAUSE_MESSAGE, dto.getJobId());
     }
 
     private void transactionRollback(AutoExecMessageDTO message) {
@@ -193,7 +194,7 @@ public class ExecJobRServiceProvider extends AbstractBasicProvider implements Ex
         if (updateCount == 0) {
             return;
         }
-        this.jobLog(Loglevel.INFO, DmI18nUtils.getMessage(I18nDmMsgKeys.AUTO_EXEC_GROUP_ROLLBACK_MESSAGE.name()), message.getJobId());
+        this.jobLog(Loglevel.INFO, I18nDmMsgKeys.AUTO_EXEC_GROUP_ROLLBACK_MESSAGE, message.getJobId());
     }
 
     private void transactionFinish(AutoExecMessageDTO dto) {
@@ -208,7 +209,8 @@ public class ExecJobRServiceProvider extends AbstractBasicProvider implements Ex
         if (this.execDal.autoJobMapper().markJobFailedIfActive(dto.getJobId()) == 0) {
             return;
         }
-        this.jobLog(Loglevel.ERROR, DmI18nUtils.getMessage(I18nDmMsgKeys.AUTO_EXEC_CREATE_SESSION_ERROR_MESSAGE.name(), dto.getMessage()), dto.getJobId());
+        this.jobLog(Loglevel.ERROR, I18nDmMsgKeys.AUTO_EXEC_CREATE_SESSION_ERROR_MESSAGE, dto.getJobId(),
+                dto.getMessage());
 
         this.approvalStateService.failExecution(jobDO.getDependOnBizId(), null);
     }
@@ -218,7 +220,8 @@ public class ExecJobRServiceProvider extends AbstractBasicProvider implements Ex
         if (jobDO == null || this.execDal.autoJobMapper().markJobFailedIfActive(dto.getJobId()) == 0) {
             return;
         }
-        this.jobLog(Loglevel.ERROR, DmI18nUtils.getMessage(I18nDmMsgKeys.AUTO_EXEC_JOB_PREPARE_ERROR_MESSAGE.name(), dto.getMessage()), dto.getJobId());
+        this.jobLog(Loglevel.ERROR, I18nDmMsgKeys.AUTO_EXEC_JOB_PREPARE_ERROR_MESSAGE, dto.getJobId(),
+                dto.getMessage());
         this.approvalStateService.failExecution(jobDO.getDependOnBizId(), null);
     }
 
@@ -230,7 +233,7 @@ public class ExecJobRServiceProvider extends AbstractBasicProvider implements Ex
         if (this.execDal.autoJobMapper().finishJobIfActive(dto.getJobId()) == 0) {
             return;
         }
-        this.jobLog(Loglevel.INFO, DmI18nUtils.getMessage(I18nDmMsgKeys.AUTO_EXEC_JOB_FINISH_MESSAGE.name()), dto.getJobId());
+        this.jobLog(Loglevel.INFO, I18nDmMsgKeys.AUTO_EXEC_JOB_FINISH_MESSAGE, dto.getJobId());
 
         this.approvalStateService.completeExecution(jobDO.getDependOnBizId());
     }
@@ -244,8 +247,8 @@ public class ExecJobRServiceProvider extends AbstractBasicProvider implements Ex
         if (this.execDal.autoJobMapper().markJobFailedIfActive(dto.getJobId()) == 0) {
             return;
         }
-        String msg = DmI18nUtils.getMessage(I18nDmMsgKeys.AUTO_EXEC_JOB_FAILED_MESSAGE.name(), taskDO.getExecOrder(), taskDO.getExecSql());
-        this.jobLog(Loglevel.ERROR, msg, dto.getJobId());
+        this.jobLog(Loglevel.ERROR, I18nDmMsgKeys.AUTO_EXEC_JOB_FAILED_MESSAGE, dto.getJobId(),
+                taskDO.getExecOrder(), taskDO.getExecSql());
 
         this.approvalStateService.failExecution(jobDO.getDependOnBizId(), null);
     }
@@ -319,8 +322,13 @@ public class ExecJobRServiceProvider extends AbstractBasicProvider implements Ex
         }
     }
 
-    private void jobLog(Loglevel logLevel, String message, Long jobId) {
-        DmExecAutoJobDO job = execDal.autoJobMapper().selectById(jobId);
+    private void jobLog(Loglevel logLevel, I18nDmMsgKeys messageKey, Long jobId, Object... args) {
+        DmExecAutoJobDO job = execDal.autoJobMapper().queryById(jobId);
+        Locale locale = DmI18nUtils.getLocale();
+        if (job.getConfig() != null && StringUtils.isNotBlank(job.getConfig().getLanguageTag())) {
+            locale = Locale.forLanguageTag(job.getConfig().getLanguageTag());
+        }
+        String message = DmI18nUtils.getMessage(messageKey.name(), locale, args);
         DmMonBizLogDO logDO = new DmMonBizLogDO(logLevel, message, LogDependBizType.AUTO_EXEC_JOB, job.getBizId());
         monitorDal.bizLogMapper().insert(logDO);
     }
