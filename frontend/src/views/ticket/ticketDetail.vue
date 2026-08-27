@@ -3454,6 +3454,19 @@ export default {
   background: transparent;
 }
 
+.ticket-exec-log-content {
+  margin: 0;
+  font-family: Menlo, Monaco, 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+  letter-spacing: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 360px;
+  overflow: auto;
+}
+
 .ticket-execution-pagination {
   display: flex;
   justify-content: flex-end;

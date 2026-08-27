@@ -23,7 +23,22 @@ public class KafkaKeys {
     public static final String ADAPTER_NAME_VALUE      = "kafka";
     public static final String START_URL               = JdbcDriver.START_URL + ADAPTER_NAME_VALUE + "://";
     public static final String DEFAULT_CLIENT_NAME     = "CloudDM-Kafka";
-    public static final String DEFAULT_SCHEMA          = "cluster";
+    public static final String DEFAULT_SCHEMA          = "Topics";
+    public static final String SCHEMA_TOPICS           = "Topics";
+    public static final String SCHEMA_GROUPS           = "groups";
+
+    public static boolean isGroupsSchema(String schema) {
+        if (schema == null || schema.isEmpty()) {
+            return false;
+        }
+        return SCHEMA_GROUPS.equalsIgnoreCase(schema)
+                || "Consumer Groups".equalsIgnoreCase(schema)
+                || "消费组".equals(schema);
+    }
+
+    public static boolean isTopicsSchema(String schema) {
+        return !isGroupsSchema(schema);
+    }
 
     public static final String SERVER                  = JdbcDriver.P_SERVER;
     public static final String CONN_TIMEOUT            = "connectTimeout";

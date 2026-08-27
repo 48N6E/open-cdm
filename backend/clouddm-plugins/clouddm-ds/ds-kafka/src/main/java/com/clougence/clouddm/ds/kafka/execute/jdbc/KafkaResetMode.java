@@ -15,23 +15,10 @@
  */
 package com.clougence.clouddm.ds.kafka.execute.jdbc;
 
-import lombok.Getter;
-import lombok.Setter;
+public enum KafkaResetMode {
 
-@Getter
-@Setter
-public class KafkaCommand {
-
-    private KafkaCommandType type;
-    private String           topic;
-    private String           groupId;
-    private boolean          fromBeginning = true;
-    private Integer          partition;
-    private int              limit         = 100;
-    private String           configKey;
-    private String           configValue;
-    private Integer          totalPartitions;
-    private KafkaResetMode   resetMode;
-    private Long             resetOffset;
-    private Long             resetTimestamp;
+    OFFSET,
+    BEGINNING,
+    LATEST,
+    TIMESTAMP
 }
