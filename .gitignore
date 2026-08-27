@@ -31,6 +31,7 @@ gen
 
 # buildTools
 /package/build/
+/package/local-docker/
 
 # run data dir.
 /backend/logs
