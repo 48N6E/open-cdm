@@ -13,21 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.clougence.clouddm.console.web.model.fo.editor.query;
-
-import lombok.Getter;
-import lombok.Setter;
+package com.clougence.clouddm.sdk.execute.dsconf.capability;
 
 /**
- * @author mode 2021/1/16 16:36
+ * Extended datasource properties for specifying a client time zone.
  */
-@Getter
-@Setter
-public class DownloadResultFO {
+public interface ClientTimeZoneExtProperties {
 
-    private String resultId;
-    private String downloadFileName;
+    String CLIENT_TIME_ZONE_FIELD = "clientTimeZone";
 
-    // private boolean compress;
-    // private String  compressFormat;
+    String getClientTimeZone();
 }
