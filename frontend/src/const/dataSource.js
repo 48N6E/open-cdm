@@ -5,7 +5,7 @@ export const Greenplum = ['Greenplum'];
 export const Cloudberry = ['Cloudberry'];
 export const CockroachDB = ['CockroachDB'];
 export const Oracle = ['Oracle'];
-export const Redis = ['Redis'];
+export const Redis = ['Redis', 'Valkey'];
 export const TiDB = ['TiDB'];
 
 export const SqlServer = ['SQLServer'];

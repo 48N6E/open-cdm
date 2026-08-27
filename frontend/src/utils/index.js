@@ -27,7 +27,7 @@ export const dsGroup = {
     'Hologres',
     'CockroachDB'
   ],
-  noStruct: ['Redis'],
+  noStruct: ['Redis', 'Valkey'],
   supportTransaction: ['MySQL', 'PostgreSQL', 'Greenplum', 'Cloudberry', 'CockroachDB']
 };
 
@@ -95,6 +95,7 @@ export const separatePort = (type) =>
   ![
     'Kudu',
     'Redis',
+    'Valkey',
     'ElastiCache',
     'ClickHouse',
     'ElasticSearch',
