@@ -1484,13 +1484,6 @@ export default {
         FUNC: 'object-browser-search-function-placeholder',
         TRIGGER: 'object-browser-search-trigger-placeholder'
       };
-      if (this.currentTab.dsType === 'Kafka') {
-        const schema = String(this.currentTab.node?.SCHEMA?.id || this.currentTab.selectValue || '').toLowerCase();
-        if (schema === 'groups' || schema === 'consumer groups' || schema === '消费组') {
-          return this.$t('object-browser-search-group-placeholder');
-        }
-        return this.$t('object-browser-search-topic-placeholder');
-      }
       return this.$t(placeholderKeyMap[this.currentTab.leafType] || 'object-browser-search-generic-placeholder');
     },
     currentObjectPaginationKey() {
@@ -2241,10 +2234,6 @@ export default {
     },
     handleDblClick(node) {
       appLogger.debug('dbl click');
-      if (this.currentTab.dsType === 'Kafka') {
-        this.handleSetSelected(node);
-        return;
-      }
       let sql = '';
       const dsQueryMap = this.getQuickQuery(this.currentTab.dsType);
       const dsClassify = this.getDsClassify(this.currentTab.dsType);
@@ -2408,11 +2397,8 @@ export default {
     handleSetSelected(node, selected = true) {
       if (this.$refs.tableTree) {
         this.selectedNode = node;
-        const rootNode = this.getRootNode(node);
-        const name = rootNode.objName || rootNode.title;
         this.currentTab.selectedTable = {
-          title: name,
-          objName: name
+          title: this.getRootNode(node).title
         };
         this.$refs.tableTree.setSelected(node.key, selected);
       }

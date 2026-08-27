@@ -51,6 +51,5 @@ public enum CommandType {
     ADMIN_COMMAND,
     FSYNC,
     FSYNC_UNLOCK,
-    CURRENT_OP,
-    ADMIN_READ
+    CURRENT_OP
 }

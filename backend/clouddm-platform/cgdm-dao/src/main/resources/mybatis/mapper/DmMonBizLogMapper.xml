@@ -29,8 +29,6 @@
             dm_mon_biz_log
         where
             depend_on_biz_id = #{bizId}
-        ORDER BY
-            id
     </select>
 
     <select id="queryListByBizIdAndType" resultMap="autoExecJobDO">

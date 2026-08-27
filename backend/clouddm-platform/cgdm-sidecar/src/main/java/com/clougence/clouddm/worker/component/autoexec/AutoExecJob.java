@@ -21,7 +21,6 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.security.MessageDigest;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HexFormat;
 import java.util.LinkedList;
@@ -340,10 +339,8 @@ public class AutoExecJob implements Runnable {
 
                 long affectLine = 0;
                 String errorMessage = null;
-                List<Result> echoes = new ArrayList<>();
                 do {
                     for (Result result : sessionAgent.popList()) {
-                        echoes.add(result);
                         if (result instanceof ResultCount) {
                             affectLine += Math.max(0, ((ResultCount) result).getUpdateCount());
                         } else if (result instanceof ResultMessage && ((ResultMessage) result).getLevel() == MessageLevel.Error) {
@@ -365,11 +362,10 @@ public class AutoExecJob implements Runnable {
                     throw new IllegalStateException(errorMessage);
                 }
                 log.info("sql exec success,affect line: {}", affectLine);
-                String echoText = AutoExecResultText.format(echoes, affectLine);
                 if (job.isEnableTransactional()) {
-                    sendMessage(AutoExecMessageDTO.taskWaitConfirmMessage(queryId, affectLine, retryCount + 1, echoText), false);
+                    sendMessage(AutoExecMessageDTO.taskWaitConfirmMessage(queryId, affectLine, retryCount + 1), false);
                 } else {
-                    sendMessage(AutoExecMessageDTO.taskFinishMessage(queryId, affectLine, retryCount + 1, echoText), false);
+                    sendMessage(AutoExecMessageDTO.taskFinishMessage(queryId, affectLine, retryCount + 1), false);
                 }
                 return true;
             } catch (Throwable e) {

@@ -30,12 +30,7 @@ public class MongoAnalysisHelper {
             case FIND_ONE:
             case COUNT:
             case DISTINCT:
-            case COUNT_DOCUMENTS:
-            case RS_STATUS:
-            case RS_CONF:
-            case RS_REPLICATION_INFO:
-            case SH_STATUS:
-            case SH_BALANCER_STATUS: {
+            case COUNT_DOCUMENTS: {
                 return RuleQueryType.READ;
             }
             case DATA_SIZE:

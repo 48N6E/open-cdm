@@ -39,10 +39,10 @@ import lombok.experimental.FieldNameConstants;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CrdbConfig extends DataSourceConfig {
 
-    @ConfigDef(name = Fields.defaultCatalog, //
+    @ConfigDef(name = Fields.defaultCatalog, defaultValue = "defaultdb", //
             group = DsConfigGroup.GENERAL, labelKey = CrdbConfigI18nKeys.CONFIG_RDB_DEFAULT_DB_LABEL, descKey = CrdbConfigI18nKeys.CONFIG_RDB_DEFAULT_DB_DESC, readOnly = false)
     private String  defaultCatalog;
-    @ConfigDef(name = Fields.defaultSchema, //
+    @ConfigDef(name = Fields.defaultSchema, defaultValue = "public", //
             group = DsConfigGroup.GENERAL, labelKey = CrdbConfigI18nKeys.CONFIG_RDB_DEFAULT_SCHEMA_LABEL, descKey = CrdbConfigI18nKeys.CONFIG_RDB_DEFAULT_SCHEMA_DESC, readOnly = false)
     private String  defaultSchema;
     @ConfigDef(name = Fields.clientTimeZone, //
@@ -57,9 +57,6 @@ public class CrdbConfig extends DataSourceConfig {
 
     public CrdbConfig(){
         setDataSourceType(DataSourceType.CockroachDB);
-        setDefaultCatalog("defaultdb");
-        setDefaultSchema("public");
-        setSslMode(SslMode.TRUST);
     }
 
     public Properties asDriverProperties() {

@@ -26,8 +26,6 @@ COMMENT2: '/*' .*? '*/'         -> channel(COMMENT);
 
 /* key command words */
 DB: 'db';
-RS: 'rs';
-SH: 'sh';
 SHOW: 'show';
 DATABASES: 'databases';
 DBS: 'dbs';

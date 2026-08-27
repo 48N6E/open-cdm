@@ -109,18 +109,6 @@ public class ExecJobRServiceProviderTest {
     }
 
     @Test
-    public void shouldPersistTaskSuccessResult() {
-        AutoExecMessageDTO message = AutoExecMessageDTO.taskFinishMessage("task-query", 1L, 1, "Query OK, 1 row affected");
-        ReflectionTestUtils.invokeMethod(provider, "taskFinish", message);
-
-        verify(taskMapper).updateById(argThat((DmExecAutoTaskDO task) -> task.getStatus() == AutoExecTaskStatus.FINISH && Long.valueOf(1L).equals(task.getAffectRow())));
-        verify(bizLogMapper).insert(argThat((DmMonBizLogDO log) -> log.getLogLevel() == Loglevel.INFO
-            && log.getDependOnBizType() == LogDependBizType.AUTO_EXEC_TASK
-            && "ticket-task".equals(log.getDependOnBizId())
-            && "Query OK, 1 row affected".equals(log.getContent())));
-    }
-
-    @Test
     public void shouldIgnoreDuplicateJobFailureAfterTerminalTransition() {
         when(jobMapper.markJobFailedIfActive(6L)).thenReturn(0);
 

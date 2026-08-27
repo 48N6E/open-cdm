@@ -30,35 +30,11 @@ functionCommand:
     | collectionFunction
     | environmentFunction
     | showFunction
-    | replicaSetFunction
-    | shardingFunction
     | use
     ;
 
 use:
     USE ID
-    ;
-
-replicaSetFunction:
-    RS DOT replicaSetMethod LS_BRACKET (TRUE | FALSE | obj)? RS_BRACKET
-    ;
-
-replicaSetMethod:
-    ID
-    | keyWordId
-    | PRINT_REPLICATION_INFO
-    | PRINT_SECONDARY_REPLICATION_INFO
-    | GET_REPLICATION_INFO
-    ;
-
-shardingFunction:
-    SH DOT shardingMethod LS_BRACKET (TRUE | FALSE | obj)? RS_BRACKET
-    ;
-
-shardingMethod:
-    ID
-    | keyWordId
-    | PRINT_SHARDING_STATUS
     ;
 
 databaseFunction:
@@ -369,8 +345,6 @@ keyWordId:
     | CURRENT_OP
     | DROP_DATABASE
     | EXPLAIN
-    | RS
-    | SH
     ;
 
 

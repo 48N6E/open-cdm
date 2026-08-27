@@ -24,7 +24,6 @@ import com.clougence.sql.mongodb.parser.ast.commands.AbstractMongoFunc;
 import com.clougence.sql.mongodb.parser.ast.commands.collection.CollectionFunc;
 import com.clougence.sql.mongodb.parser.ast.commands.collection.DataSizeFunc;
 import com.clougence.sql.mongodb.parser.ast.commands.collection.RenameCollectionFunc;
-import com.clougence.sql.mongodb.parser.ast.commands.db.MongoReadCommandFunc;
 import com.clougence.utils.future.CgFuture;
 import com.mongodb.client.MongoClient;
 
@@ -81,8 +80,6 @@ class MongoDistributeCall {
             case GET_PARAMETER:
             case KILL_OP:
                 return ClientCallForCommand.runCommand(sync, client, func.toBson(), request, receive, "admin");
-            case ADMIN_READ:
-                return ClientCallForCommand.runCommand(sync, client, func.toBson(), request, receive, ((MongoReadCommandFunc) func).getDatabase());
             default:
                 throw new UnsupportedOperationException();
         }
