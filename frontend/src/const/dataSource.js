@@ -3,6 +3,7 @@ export const MySQL = ['MySQL'];
 export const PostgreSQL = ['PostgreSQL'];
 export const Greenplum = ['Greenplum'];
 export const Cloudberry = ['Cloudberry'];
+export const CockroachDB = ['CockroachDB'];
 export const Oracle = ['Oracle'];
 export const Redis = ['Redis', 'Valkey'];
 export const TiDB = ['TiDB'];
@@ -13,7 +14,7 @@ export const Db2 = ['Db2'];
 
 export const Dameng = ['Dameng'];
 
-export const HasSchema = [...Oracle, ...PostgreSQL, ...Greenplum, ...Cloudberry, ...SqlServer];
+export const HasSchema = [...Oracle, ...PostgreSQL, ...Greenplum, ...Cloudberry, ...CockroachDB, ...SqlServer];
 
 export const isMySQL = (type) => MySQL.includes(type);
 export const isPostgreSQL = (type) => PostgreSQL.includes(type);

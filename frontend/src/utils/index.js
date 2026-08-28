@@ -24,10 +24,11 @@ export const dsGroup = {
     'SelectDB',
     'StarRocks',
     'MaxCompute',
-    'Hologres'
+    'Hologres',
+    'CockroachDB'
   ],
   noStruct: ['Redis', 'Valkey'],
-  supportTransaction: ['MySQL', 'PostgreSQL', 'Greenplum', 'Cloudberry']
+  supportTransaction: ['MySQL', 'PostgreSQL', 'Greenplum', 'Cloudberry', 'CockroachDB']
 };
 
 export const hasSchema = (type) => dsGroup.hasSchema.includes(type);
