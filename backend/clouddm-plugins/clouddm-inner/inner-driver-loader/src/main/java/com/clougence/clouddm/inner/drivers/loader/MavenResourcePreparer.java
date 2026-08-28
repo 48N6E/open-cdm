@@ -255,15 +255,8 @@ public class MavenResourcePreparer extends AbstractResourcePreparer {
         }
 
         DependencyFilter runtimeFilter = DependencyFilterUtils.classpathFilter(JavaScopes.RUNTIME);
-        DependencyFilter filter = (node, parents) -> {
-            if (!runtimeFilter.accept(node, parents)) {
-                return false;
-            }
-            Dependency dependency = node.getDependency();
-            return dependency == null || !dependency.isOptional();
-        };
         PreorderNodeListGenerator nodeListGenerator = new PreorderNodeListGenerator();
-        collectResult.getRoot().accept(new FilteringDependencyVisitor(nodeListGenerator, filter));
+        collectResult.getRoot().accept(new FilteringDependencyVisitor(nodeListGenerator, runtimeFilter));
 
         Map<String, Artifact> artifactMap = new LinkedHashMap<>();
         for (Object item : nodeListGenerator.getNodes()) {
