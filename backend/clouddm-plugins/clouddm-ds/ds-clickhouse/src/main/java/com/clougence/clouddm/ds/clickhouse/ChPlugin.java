@@ -31,6 +31,7 @@ import com.clougence.clouddm.ds.clickhouse.dialect.ClickHouseDialect;
 import com.clougence.clouddm.ds.clickhouse.dsconf.ChConfigSpi;
 import com.clougence.clouddm.ds.clickhouse.dsconf.ChSerializationSpi;
 import com.clougence.clouddm.ds.clickhouse.execute.ChSessionFactory;
+import com.clougence.clouddm.ds.clickhouse.execute.ChSessionSpi;
 import com.clougence.clouddm.ds.clickhouse.execute.ChSupportSpi;
 import com.clougence.clouddm.ds.clickhouse.execute.explain.ChExplainPlanSpi;
 import com.clougence.clouddm.ds.clickhouse.i18n.ChConfigI18nKeys;
@@ -38,7 +39,6 @@ import com.clougence.clouddm.ds.clickhouse.i18n.ChDsI18nKeys;
 import com.clougence.clouddm.ds.clickhouse.language.ChLanguageSpi;
 import com.clougence.clouddm.ds.clickhouse.resource.ChEditorResourceSpi;
 import com.clougence.clouddm.dsfamily.definition.TypeMapUtils;
-import com.clougence.clouddm.dsfamily.execute.RdbSessionSpi;
 import com.clougence.clouddm.sdk.DsPlugin;
 import com.clougence.clouddm.sdk.DsPluginBinder;
 import com.clougence.clouddm.sdk.Plugin;
@@ -85,7 +85,7 @@ public class ChPlugin implements DsPlugin, SchemaPlugin, DsFeatureIDs {
         dsPlugin.bindDsDriverFamily("ClickHouse JDBC", "Yandex JDBC", "Native JDBC");
         dsPlugin.bindSqlEngine("ClickHouse SQL");
 
-        dsPlugin.addPluginSpi(new RdbSessionSpi());
+        dsPlugin.addPluginSpi(new ChSessionSpi());
         dsPlugin.addPluginSpi(new ChSupportSpi());
         dsPlugin.addPluginSpi(new ChExplainPlanSpi());
     }

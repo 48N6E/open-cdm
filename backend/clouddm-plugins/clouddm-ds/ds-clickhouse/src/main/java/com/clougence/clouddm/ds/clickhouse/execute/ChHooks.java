@@ -97,7 +97,9 @@ public class ChHooks implements SessionHook {
     @Override
     public void setAutoCommit(Connection conn, boolean autoCommit) throws SQLException {
         if (!this.transaction) {
-            throw new UnsupportedOperationException("ClickHouse Driver Unsupported.");
+            // ClickHouse JDBC (non-Native) has no transaction support; autoexec always
+            // resets autoCommit in finally, so treat it as a no-op instead of failing the job.
+            return;
         }
         conn.setAutoCommit(autoCommit);
     }
@@ -189,10 +191,17 @@ public class ChHooks implements SessionHook {
 
     @Override
     public void killProcess(Connection connection, String queryID) throws SQLException {
-        try {
-            String sql = "kill query " + queryID;
-            Statement statement = connection.createStatement();
-            statement.executeUpdate(sql);
+        if (StringUtils.isBlank(queryID) || "0".equals(queryID)) {
+            log.warn("skip ClickHouse kill, invalid query id: {}", queryID);
+            return;
+        }
+
+        // ClickHouse requires WHERE against system.processes. MySQL-style
+        // "KILL QUERY <id>" is invalid and fails pause / cancel of long queries.
+        String escaped = queryID.replace("\\", "\\\\").replace("'", "\\'");
+        String sql = "KILL QUERY WHERE query_id = '" + escaped + "'";
+        try (Statement statement = connection.createStatement()) {
+            statement.execute(sql);
         } catch (SQLException e) {
             throw ChExceptionUtils.toException(e);
         }

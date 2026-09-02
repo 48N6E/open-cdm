@@ -161,6 +161,7 @@ public class AutoExecJob implements Runnable {
                 log.error(e.getMessage(), e);
             }
         } finally {
+            this.flushPendingMessages();
             if (this.sessionAgent != null) {
                 try {
                     this.sessionAgent.close();
@@ -294,7 +295,11 @@ public class AutoExecJob implements Runnable {
             log.error("auto execution job failed, jobId: " + job.getJobId(), e);
             return JobResult.FAILED;
         } finally {
-            sessionAgent.setAutoCommit(true);
+            try {
+                sessionAgent.setAutoCommit(true);
+            } catch (Exception e) {
+                log.warn("reset autoCommit failed after auto execution job, jobId={}", job.getJobId(), e);
+            }
         }
     }
 
@@ -416,7 +421,12 @@ public class AutoExecJob implements Runnable {
         }
         log.warn("job start pause");
         if (this.sessionAgent != null && this.sessionAgent.isExecuting()) {
-            sessionAgent.cancel();
+            try {
+                sessionAgent.cancel();
+            } catch (Exception e) {
+                // pauseRequested is already set; keep pause progressing even if kill fails.
+                log.error("cancel running query failed while pausing job, queryId={}", this.runningQueryId, e);
+            }
         }
     }
 
@@ -430,16 +440,22 @@ public class AutoExecJob implements Runnable {
     private void sendMessage(AutoExecMessageDTO message, boolean immediately) {
         this.messageList.add(message);
         if (immediately) {
-            while (true) {
-                try {
-                    this.execJobRService.reportMessage(identity(), this.messageList);
-                    this.messageList = new LinkedList<>();
-                    return;
-                } catch (Exception e) {
-                    log.error("reportExecMessage error", e);
-                    // wait next
-                    ThreadUtils.sleep(5000);
-                }
+            this.flushPendingMessages();
+        }
+    }
+
+    private void flushPendingMessages() {
+        if (this.messageList.isEmpty()) {
+            return;
+        }
+        while (true) {
+            try {
+                this.execJobRService.reportMessage(identity(), this.messageList);
+                this.messageList = new LinkedList<>();
+                return;
+            } catch (Exception e) {
+                log.error("reportExecMessage error", e);
+                ThreadUtils.sleep(5000);
             }
         }
     }

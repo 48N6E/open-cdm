@@ -588,9 +588,18 @@ public class AutoExecServiceImpl implements AutoExecService {
 
         switch (job.getStatus()) {
             case INIT:
-            case WAIT_EXEC:
+            case WAIT_EXEC: {
+                vo.setCanPause(true);
+                break;
+            }
             case EXECUTING: {
                 vo.setCanPause(true);
+                // Allow force terminate when ClickHouse/other DS kill cannot stop the running SQL.
+                vo.setCanEnd(true);
+                break;
+            }
+            case PAUSING: {
+                vo.setCanEnd(true);
                 break;
             }
             case PAUSE: {
@@ -621,8 +630,19 @@ public class AutoExecServiceImpl implements AutoExecService {
         if (job == null || job.getStatus() == AutoExecJobStatus.TERMINATION) {
             return;
         }
-        if (job.getStatus() != AutoExecJobStatus.PAUSE && job.getStatus() != AutoExecJobStatus.FAILED) {
+
+        AutoExecJobStatus status = job.getStatus();
+        boolean forceStop = status == AutoExecJobStatus.EXECUTING || status == AutoExecJobStatus.PAUSING;
+        if (!forceStop && status != AutoExecJobStatus.PAUSE && status != AutoExecJobStatus.FAILED) {
             throw new ErrorMessageException(DmI18nUtils.getMessage(I18nDmMsgKeys.AUTO_EXEC_RETRY_JOB_ERROR_MESSAGE.name()));
+        }
+
+        if (forceStop && job.getWorkerSeqNumber() != null) {
+            try {
+                this.execRService.pauseJob(CallUtils.buildSendDTO(job.getWorkerSeqNumber()), job.getId());
+            } catch (Exception e) {
+                log.error("force end: pauseJob rpc failed, jobId={}", job.getId(), e);
+            }
         }
 
         job.setStatus(AutoExecJobStatus.TERMINATION);
@@ -709,6 +729,7 @@ public class AutoExecServiceImpl implements AutoExecService {
         if (status == AutoExecJobStatus.INIT || status == AutoExecJobStatus.PACKAGING) {
             job.setStatus(AutoExecJobStatus.PAUSE);
             this.execDal.autoJobMapper().updateById(job);
+            this.approvalStateService.pauseExecution(job.getDependOnBizId());
             return;
         }
 
@@ -721,10 +742,16 @@ public class AutoExecServiceImpl implements AutoExecService {
             return;
         }
 
-        this.execRService.pauseJob(CallUtils.buildSendDTO(job.getWorkerSeqNumber()), jobId);
-
+        // Persist PAUSING before RPC so UI leaves EXECUTING even if kill is slow/fails.
         job.setStatus(AutoExecJobStatus.PAUSING);
         this.execDal.autoJobMapper().updateById(job);
+        this.approvalStateService.pauseExecution(job.getDependOnBizId());
+
+        try {
+            this.execRService.pauseJob(CallUtils.buildSendDTO(job.getWorkerSeqNumber()), jobId);
+        } catch (Exception e) {
+            log.error("pauseJob rpc failed, jobId={}, keep status PAUSING", jobId, e);
+        }
     }
 
     private RSocketSendDTO buildRSocketSendDTO(long bindClusterId) {

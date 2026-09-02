@@ -64,5 +64,7 @@ public interface ApprovalStateService {
 
     void failExecution(String approvalBizId, String errorMessage);
 
+    void pauseExecution(String approvalBizId);
+
     void cancelExecution(String approvalBizId);
 }

@@ -187,6 +187,7 @@ public class ExecJobRServiceProvider extends AbstractBasicProvider implements Ex
             return;
         }
         this.jobLog(Loglevel.INFO, I18nDmMsgKeys.AUTO_EXEC_JOB_PAUSE_MESSAGE, dto.getJobId());
+        this.approvalStateService.pauseExecution(jobDO.getDependOnBizId());
     }
 
     private void transactionRollback(AutoExecMessageDTO message) {

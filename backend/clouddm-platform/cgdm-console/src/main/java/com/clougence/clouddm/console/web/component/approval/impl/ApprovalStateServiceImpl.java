@@ -292,6 +292,20 @@ public class ApprovalStateServiceImpl implements ApprovalStateService {
 
     @Transactional(rollbackFor = Throwable.class, propagation = Propagation.REQUIRED)
     @Override
+    public void pauseExecution(String approvalBizId) {
+        DmApprovalDO approval = this.approval(approvalBizId);
+        if (approval == null) {
+            return;
+        }
+        if (approval.getTicketStatus() == ApprovalStatus.EXEC_PAUSE || ApprovalStatus.isEndStatus(approval.getTicketStatus())) {
+            return;
+        }
+        this.updateProcessStatus(approval.getId(), ApprovalStage.EXECUTION, ApprovalProcessStatus.PAUSE, null);
+        this.updateApprovalStatus(approval.getId(), ApprovalStatus.EXEC_PAUSE, null);
+    }
+
+    @Transactional(rollbackFor = Throwable.class, propagation = Propagation.REQUIRED)
+    @Override
     public void cancelExecution(String approvalBizId) {
         DmApprovalProcessDO process = this.executionProcess(approvalBizId);
         if (process == null) {
