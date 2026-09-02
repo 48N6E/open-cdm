@@ -50,6 +50,7 @@ dependencies {
     testImplementation(project(':ds-redis'))
     testImplementation(project(':ds-valkey'))
     testImplementation(project(':ds-hologres'))
+    testImplementation(project(':ds-cockroachdb'))
     testImplementation(project(':ds-mongodb'))
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.13.4'
