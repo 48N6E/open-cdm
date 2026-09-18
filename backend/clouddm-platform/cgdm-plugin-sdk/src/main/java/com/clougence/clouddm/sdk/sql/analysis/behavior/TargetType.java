@@ -32,6 +32,11 @@ public enum TargetType {
     Role(UmiTypes.ROLE),
     ConfigKey(null),
     File(null),
+    Session(null),
+    Backup(null),
+    Tablet(null),
+    Transaction(null),
+    Statistics(null),
 
     Query(null),
     Update(null),
@@ -122,9 +127,7 @@ public enum TargetType {
     ClusterNode(null),
     Broker(null),
 
-    // Statistics and physical storage objects without UMI metadata counterparts.
-    Statistics(null),
-    Tablet(null),
+    // Physical storage objects without UMI metadata counterparts.
     Replica(null),
 
     // Persistent backup configuration and snapshots, independent of running jobs.
