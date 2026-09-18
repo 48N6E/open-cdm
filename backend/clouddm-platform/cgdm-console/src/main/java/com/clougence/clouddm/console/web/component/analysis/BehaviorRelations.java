@@ -90,6 +90,11 @@ public final class BehaviorRelations {
             TargetType.Tablespace, TargetType.Log, TargetType.Library, TargetType.ResourceGroup, TargetType.Replication, //
             TargetType.PublicationSubscription, TargetType.Publication, TargetType.Subscription, TargetType.PrepareStatement);
 
+    // These types carry resolved instance or object-ancestor paths, including unnamed sets.
+    private static final Set<TargetType> EXPLICIT_PATH_TARGETS = EnumSet.of(
+            TargetType.Resource, TargetType.StorageVolume, TargetType.SecurityIntegration, TargetType.GroupProvider,
+            TargetType.ClusterNode, TargetType.Broker, TargetType.Statistics, TargetType.Tablet, TargetType.Replica, TargetType.Repository, TargetType.Snapshot);
+
     // These objects already carry their native scope; URI-style object names are opaque path content.
     private static final Set<TargetType> NATIVE_SCOPE_TARGETS = EnumSet.of(
             TargetType.Instance, TargetType.ServiceMasterKey, TargetType.Queue, TargetType.Link,
@@ -130,7 +135,8 @@ public final class BehaviorRelations {
                 TargetType.Profile, TargetType.Context, TargetType.Queue, TargetType.QueueSubscriber, //
                 TargetType.Pipe, TargetType.SchedulerObject, TargetType.SchemaObject, TargetType.Library, //
                 TargetType.Replication, TargetType.PublicationSubscription, TargetType.Publication, TargetType.Subscription, //
-                TargetType.Log, TargetType.ConfigKey, //
+
+                TargetType.Log, TargetType.ConfigKey, TargetType.SecurityIntegration, TargetType.GroupProvider,//
                 TargetType.Certificate, TargetType.AsymmetricKey, TargetType.SymmetricKey, TargetType.Credential, //
                 TargetType.DatabaseMasterKey, TargetType.ServiceMasterKey, TargetType.DatabaseEncryptionKey, //
                 TargetType.ColumnMasterKey, TargetType.ColumnEncryptionKey, //
@@ -143,7 +149,8 @@ public final class BehaviorRelations {
     private static void registerMaintainAuthKinds(Map<TargetType, SecDataAuthKind> overrides) {
         putAuthKinds(overrides, SecDataAuthKind.MAINTAIN, //
                 TargetType.Environment, TargetType.Instance, TargetType.Machine, //
-                TargetType.ResourceGroup, TargetType.EventSession, TargetType.AvailabilityGroup);
+
+                TargetType.ResourceGroup, TargetType.EventSession, TargetType.AvailabilityGroup, TargetType.Resource, TargetType.StorageVolume, TargetType.ClusterNode, TargetType.Broker, TargetType.Statistics, TargetType.Tablet, TargetType.Replica, TargetType.Repository, TargetType.Snapshot);
     }
 
     private static void putAuthKinds(Map<TargetType, SecDataAuthKind> overrides, SecDataAuthKind authKind, TargetType... targetTypes) {
@@ -202,6 +209,16 @@ public final class BehaviorRelations {
                     addRequest(requests, BehaviorAction.IMPORT, subject, registry, dbVersion);
                     targets.forEach(target -> {
                         addRequest(requests, BehaviorAction.READ, target, registry, dbVersion);
+                    });
+                }
+                case RESTORE -> {
+                    addRequest(requests, BehaviorAction.RESTORE, subject, registry, dbVersion);
+                    targets.forEach(target -> {
+                        BehaviorAction action = BehaviorAction.RESTORE;
+                        if (target != null && target.getObjectType() == TargetType.Snapshot) {
+                            action = BehaviorAction.READ;
+                        }
+                        addRequest(requests, action, target, registry, dbVersion);
                     });
                 }
                 case EXPORT -> {
@@ -275,10 +292,15 @@ public final class BehaviorRelations {
         String currentPath = DmDsUtils.normalizeResourcePath(currentResourcePath);
         String instancePath = DmDsUtils.normalizeResourcePath(instanceResourcePath);
         TargetType targetType = Objects.requireNonNullElse(object.getObjectType(), TargetType.Unknown);
+
+        if (EXPLICIT_PATH_TARGETS.contains(targetType) || Objects.equals(sourcePath, currentPath) || !sourcePath.startsWith(instancePath)) {
+            return sourcePath;
+        }
         // Native scope must survive both authorization and execution backfill.
         if (NATIVE_SCOPE_TARGETS.contains(targetType)) {
             return sourcePath;
         }
+
         ObjectName name = object.getObjectName();
         if ((targetType == TargetType.ConfigKey || targetType == TargetType.ResourceGroup)
                 && name != null && name.getSchema() == null && name.getObjectName() != null) {
