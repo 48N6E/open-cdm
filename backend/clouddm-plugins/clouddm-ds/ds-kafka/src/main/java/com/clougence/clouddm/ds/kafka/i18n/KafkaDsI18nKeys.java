@@ -21,5 +21,4 @@ import com.clougence.utils.i18n.I18nResource;
 public interface KafkaDsI18nKeys {
 
     String PLUGIN_NAME_KAFKA = "PLUGIN_NAME_KAFKA";
-
 }

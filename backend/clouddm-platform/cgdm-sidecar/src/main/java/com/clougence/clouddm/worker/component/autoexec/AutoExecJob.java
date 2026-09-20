@@ -23,9 +23,11 @@ import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -45,16 +47,19 @@ import com.clougence.clouddm.api.sidecar.autoexec.AutoExecMessageDTO;
 import com.clougence.clouddm.api.sidecar.session.execute.AsyncWaitResult;
 import com.clougence.clouddm.base.metadata.ds.DataSourceConfig;
 import com.clougence.clouddm.comm.model.auth.WorkerIdentity;
+import com.clougence.clouddm.sdk.execute.dsconf.DsConfigField;
 import com.clougence.clouddm.sdk.execute.resultset.echo.Result;
 import com.clougence.clouddm.sdk.execute.resultset.echo.ResultCount;
 import com.clougence.clouddm.sdk.execute.resultset.echo.ResultMessage;
 import com.clougence.clouddm.sdk.execute.session.MessageLevel;
 import com.clougence.clouddm.sdk.execute.session.QueryRequest;
+import com.clougence.clouddm.sdk.execute.session.SessionContextDTO;
 import com.clougence.clouddm.worker.component.report.ReportUtils;
 import com.clougence.clouddm.worker.component.resource.TaskDsResourceManager;
 import com.clougence.clouddm.worker.component.session.SessionAgent;
 import com.clougence.clouddm.worker.component.session.SessionManager;
 import com.clougence.utils.JsonUtils;
+import com.clougence.utils.StringUtils;
 import com.clougence.utils.ThreadUtils;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.MappingIterator;
@@ -127,7 +132,7 @@ public class AutoExecJob implements Runnable {
 
             // create session
             try {
-                DataSourceConfig dsConfig = this.configRService.fetchDsConfig(this.job.getDsId());
+                DataSourceConfig dsConfig = this.configRService.fetchDsConfig(this.job.getDsId(), sessionConfigOverrides(this.job.getContextDTO()));
                 this.sessionAgent = this.sessionManager.createSession(backgroundRM, dsConfig, this.job.getContextDTO());
                 String currentQueryId = this.sessionAgent.getCurrentQueryId();
                 sendMessage(AutoExecMessageDTO.createQueryIdMessage(this.job.getJobId(), currentQueryId), true);
@@ -435,6 +440,20 @@ public class AutoExecJob implements Runnable {
             this.workerIdentity = ReportUtils.getIdentity();
         }
         return this.workerIdentity;
+    }
+
+    private Map<String, String> sessionConfigOverrides(SessionContextDTO context) {
+        Map<String, String> configOverrides = new HashMap<>();
+        if (context == null) {
+            return configOverrides;
+        }
+        if (StringUtils.isNotBlank(context.getRdbCatalog())) {
+            configOverrides.put(DsConfigField.DEFAULT_DATABASE.getConfigName(), context.getRdbCatalog());
+        }
+        if (StringUtils.isNotBlank(context.getRdbSchema())) {
+            configOverrides.put(DsConfigField.DEFAULT_SCHEMA.getConfigName(), context.getRdbSchema());
+        }
+        return configOverrides;
     }
 
     private void sendMessage(AutoExecMessageDTO message, boolean immediately) {

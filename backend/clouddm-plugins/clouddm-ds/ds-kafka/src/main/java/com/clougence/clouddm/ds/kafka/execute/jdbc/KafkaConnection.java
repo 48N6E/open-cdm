@@ -18,7 +18,7 @@ package com.clougence.clouddm.ds.kafka.execute.jdbc;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Map;
+import java.util.Properties;
 
 import org.apache.kafka.clients.admin.AdminClient;
 
@@ -27,30 +27,22 @@ import com.clougence.drivers.adapter.AdapterConnection;
 import com.clougence.drivers.adapter.AdapterReceive;
 import com.clougence.drivers.adapter.AdapterRequest;
 import com.clougence.utils.ExceptionUtils;
-import com.clougence.utils.future.CgFuture;
-import com.clougence.utils.future.CgFutureObj;
+import com.clougence.utils.StringUtils;
 
 public class KafkaConnection extends AdapterConnection {
 
-    private final Connection          owner;
-    private final AdminClient         admin;
-    private final Map<String, String> dsConfig;
-    private final String              bootstrap;
-    private String                    schema = KafkaKeys.DEFAULT_SCHEMA;
+    private final Connection  owner;
+    private final AdminClient adminClient;
+    private String            schema;
 
-    KafkaConnection(Connection owner, AdminClient admin, Map<String, String> dsConfig, String bootstrap, String jdbcUrl){
-        super(jdbcUrl, dsConfig.get(KafkaKeys.USERNAME));
+    KafkaConnection(Connection owner, AdminClient adminClient, String jdbcUrl, Properties properties, String schema){
+        super(jdbcUrl, properties.getProperty(KafkaKeys.USERNAME));
         this.owner = owner;
-        this.admin = admin;
-        this.dsConfig = dsConfig;
-        this.bootstrap = bootstrap;
+        this.adminClient = adminClient;
+        this.schema = StringUtils.defaultIfBlank(schema, KafkaKeys.DEFAULT_SCHEMA);
     }
 
-    public AdminClient getAdmin() { return this.admin; }
-
-    public Map<String, String> getDsConfig() { return this.dsConfig; }
-
-    public String getBootstrap() { return this.bootstrap; }
+    public AdminClient getAdminClient() { return this.adminClient; }
 
     @Override
     public String getCatalog() { return this.getSchema(); }
@@ -65,9 +57,7 @@ public class KafkaConnection extends AdapterConnection {
 
     @Override
     public void setSchema(String schema) {
-        if (schema != null && !schema.isEmpty()) {
-            this.schema = schema;
-        }
+        this.schema = StringUtils.defaultIfBlank(schema, KafkaKeys.DEFAULT_SCHEMA);
     }
 
     @Override
@@ -77,13 +67,16 @@ public class KafkaConnection extends AdapterConnection {
 
     @Override
     protected <T> T unwrap(Class<T> iface) throws SQLException {
-        if (iface == KafkaConnection.class) {
+        if (iface == KafkaConnection.class || (iface != null && KafkaConnection.class.getName().equals(iface.getName()))) {
             return (T) this;
-        } else if (iface == AdminClient.class) {
-            return (T) this.admin;
-        } else {
-            return super.unwrap(iface);
         }
+        if (iface == AdminClient.class || KafkaAdminUnwrap.isAdminClientType(iface)) {
+            return (T) this.adminClient;
+        }
+        if (AdapterConnection.class.isAssignableFrom(iface) && iface.isInstance(this)) {
+            return (T) this;
+        }
+        return super.unwrap(iface);
     }
 
     public void killDriverConnection(String connID) throws SQLException {
@@ -92,9 +85,9 @@ public class KafkaConnection extends AdapterConnection {
             try {
                 conn.close();
             } catch (Throwable e) {
-                Throwable ee = ExceptionUtils.getRootCause(e);
-                if (ee instanceof SQLException) {
-                    throw (SQLException) ee;
+                Throwable root = ExceptionUtils.getRootCause(e);
+                if (root instanceof SQLException) {
+                    throw (SQLException) root;
                 }
                 throw new SQLException(e);
             }
@@ -103,11 +96,7 @@ public class KafkaConnection extends AdapterConnection {
 
     @Override
     public synchronized void doRequest(AdapterRequest request, AdapterReceive receive) throws SQLException {
-        KafkaCommand command = KafkaCommandParser.parse(((KafkaRequest) request).getCommandBody());
-        CgFuture<Object> sync = new CgFutureObj<>();
-        KafkaDistributeCall.exec(sync, this, command, request, receive);
-        sync.await();
-        receive.responseFinish(request);
+        throw new SQLException("Kafka command dialect is not supported in this milestone.");
     }
 
     @Override
@@ -117,6 +106,6 @@ public class KafkaConnection extends AdapterConnection {
 
     @Override
     protected void doClose() throws IOException {
-        this.admin.close();
+        this.adminClient.close();
     }
 }

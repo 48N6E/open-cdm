@@ -8,7 +8,7 @@
         v-model="ticketData.instanceId"
         @on-change="handleChangeInstance"
         :placeholder="$t('qing-xuan-ze-shu-ju-yuan-shi-li')"
-        show-search
+        filterable
       >
         <Option v-for="ds in allDsList" :value="ds.objId" :key="ds.objId" :label="ds.objName">
           <div style="display: flex; align-items: center">
@@ -26,7 +26,7 @@
         v-model="ticketData.catalog"
         @on-change="handleCatalogChange(true)"
         :placeholder="$t('qing-xuan-ze-shu-ju-ku')"
-        show-search
+        filterable
       >
         <Option v-for="catalog in selectedDs.CATALOG_LIST" :value="catalog.objName" :key="catalog.objName" :label="catalog.objName">
           {{ catalog.objName }}
@@ -42,7 +42,7 @@
     </template>
 
     <template v-if="ticketData.showSchemaSelect">
-      <Select style="width: 200px; margin-right: 8px" v-model="ticketData.schema" show-search>
+      <Select style="width: 200px; margin-right: 8px" v-model="ticketData.schema" filterable>
         <Option v-for="schema in selectedDs.SCHEMA_LIST" :value="schema.objName" :key="schema.objName" :label="schema.objName">
           {{ schema.objName }}
         </Option>

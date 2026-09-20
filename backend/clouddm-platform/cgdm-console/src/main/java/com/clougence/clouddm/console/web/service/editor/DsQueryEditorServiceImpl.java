@@ -42,9 +42,11 @@ import com.clougence.clouddm.console.web.service.editor.model.DataResultDataVO;
 import com.clougence.clouddm.console.web.service.editor.model.DataResultPageVO;
 import com.clougence.clouddm.console.web.service.editor.model.DsAvailableDTO;
 import com.clougence.clouddm.console.web.service.editor.model.FileSaveAsDTO;
+import com.clougence.clouddm.console.web.service.envparam.DmEnvParamService;
 import com.clougence.clouddm.console.web.util.DmConvertUtils;
 import com.clougence.clouddm.console.web.util.MessageUtils;
 import com.clougence.clouddm.console.web.util.RdpAuthUtils;
+import com.clougence.clouddm.sdk.model.env.EnvParamKeys;
 import com.clougence.clouddm.platform.dal.access.DataSourceDal;
 import com.clougence.clouddm.platform.dal.access.ExecutionDal;
 import com.clougence.clouddm.platform.dal.access.ObjectCacheDao;
@@ -97,6 +99,8 @@ public class DsQueryEditorServiceImpl implements DsQueryEditorService {
     private DmAuthServiceForBiz dmAuthServiceForBiz;
     @Resource
     private DsSchemaService     dsSchemaService;
+    @Resource
+    private DmEnvParamService   dmEnvParamService;
 
     @Override
     public boolean hasMoreSessionQuota(String userId) {
@@ -159,7 +163,12 @@ public class DsQueryEditorServiceImpl implements DsQueryEditorService {
         sessionCtx.setSessionId(usingSessionId);
         sessionCtx.setRdbAutoCommit(autoCommit);
         sessionCtx.setRdbTxIsolation(initIsolation);
-        sessionCtx.setRdbReadOnly(Boolean.TRUE.equals(dsConfig.getReadOnly()));
+        boolean consoleReadOnly = false;
+        if (dsDO.getDsEnvId() != null) {
+            String enable = this.dmEnvParamService.queryParam(dsDO.getUid(), dsDO.getDsEnvId(), EnvParamKeys.DM_ALLOW_ALL_STATEMENTS);
+            consoleReadOnly = StringUtils.equalsIgnoreCase("true", enable);
+        }
+        sessionCtx.setRdbReadOnly(Boolean.TRUE.equals(dsConfig.getReadOnly()) || consoleReadOnly);
         return this.queryService.createSession(curUid, dsLevels, sessionCtx);
     }
 

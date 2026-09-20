@@ -17,9 +17,6 @@ package com.clougence.clouddm.ds.kafka.execute.jdbc;
 
 import com.clougence.drivers.adapter.AdapterRequest;
 
-import lombok.Getter;
-
-@Getter
 public class KafkaRequest extends AdapterRequest {
 
     private final String commandBody;
@@ -27,4 +24,6 @@ public class KafkaRequest extends AdapterRequest {
     public KafkaRequest(String commandBody){
         this.commandBody = commandBody;
     }
+
+    public String getCommandBody() { return this.commandBody; }
 }

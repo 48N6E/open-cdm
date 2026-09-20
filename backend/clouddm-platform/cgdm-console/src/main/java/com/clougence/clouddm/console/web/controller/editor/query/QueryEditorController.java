@@ -52,8 +52,10 @@ import com.clougence.clouddm.console.web.service.editor.model.DataResultDataVO;
 import com.clougence.clouddm.console.web.service.editor.model.DataResultPageVO;
 import com.clougence.clouddm.console.web.service.editor.model.DsAvailableDTO;
 import com.clougence.clouddm.console.web.service.editor.model.FileSaveAsDTO;
+import com.clougence.clouddm.console.web.service.envparam.DmEnvParamService;
 import com.clougence.clouddm.console.web.util.DmConvertUtils;
 import com.clougence.clouddm.console.web.util.RdpAuthUtils;
+import com.clougence.clouddm.sdk.model.env.EnvParamKeys;
 import com.clougence.clouddm.platform.dal.access.ExecutionDal;
 import com.clougence.clouddm.platform.dal.access.ObjectCacheDao;
 import com.clougence.clouddm.platform.dal.access.entry.DsCacheEntry;
@@ -112,6 +114,8 @@ public class QueryEditorController {
     private DmSupportSpiWrapper  dmSupportSpiWrapper;
     @Resource
     private RdpOpAuditService    opAuditService;
+    @Resource
+    private DmEnvParamService    dmEnvParamService;
 
     @RequestAuth(checkOpPassword = true, value = DM_QUERY_CONSOLE)
     @RequestMapping(value = "/createSession", method = RequestMethod.POST)
@@ -196,8 +200,19 @@ public class QueryEditorController {
         vo.getSchema().setDefaultValue(StringUtils.isBlank(defaultSchema) ? "" : defaultSchema);
         vo.getIsolation().setDefaultValue(RdbIsolation.valueOfCode(dsConfig.getIsolation()).getName());
         vo.getAutoCommit().setDefaultValue(String.valueOf(!StringUtils.equalsIgnoreCase("false", autoCommit)));
-        vo.getReadOnly().setDefaultValue(String.valueOf(Boolean.TRUE.equals(dsConfig.getReadOnly())));
+        boolean consoleReadOnly = isConsoleReadOnly(puid, entry.getEnvId());
+        boolean readOnly = Boolean.TRUE.equals(dsConfig.getReadOnly()) || consoleReadOnly;
+        vo.getReadOnly().setDefaultValue(String.valueOf(readOnly));
+        vo.setConsoleQueryOnly(consoleReadOnly);
         return ResWebDataUtils.buildSuccess(vo);
+    }
+
+    private boolean isConsoleReadOnly(String puid, Long envId) {
+        if (envId == null) {
+            return false;
+        }
+        String enable = this.dmEnvParamService.queryParam(puid, envId, EnvParamKeys.DM_ALLOW_ALL_STATEMENTS);
+        return StringUtils.equalsIgnoreCase("true", enable);
     }
 
     private DsLanguageConfVO loadDsLanguage(DsCacheEntry entry, DataSourceConfig dsConfig, DsAvailableDTO status) {

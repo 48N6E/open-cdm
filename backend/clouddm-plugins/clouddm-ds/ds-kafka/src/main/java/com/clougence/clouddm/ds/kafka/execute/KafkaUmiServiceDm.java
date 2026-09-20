@@ -20,9 +20,9 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
+import com.clougence.clouddm.ds.kafka.execute.jdbc.KafkaKeys;
 import com.clougence.clouddm.dsfamily.execute.AbstractRdbUmiService;
 import com.clougence.schema.umi.service.RdbUmiServiceDm;
-import com.clougence.clouddm.ds.kafka.execute.jdbc.KafkaKeys;
 import com.clougence.schema.umi.struts.UmiTypes;
 import com.clougence.schema.umi.struts.Value;
 import com.clougence.utils.StringUtils;
@@ -43,25 +43,57 @@ public class KafkaUmiServiceDm extends AbstractRdbUmiService<KafkaMetaProviderDm
 
     @Override
     public List<Value> listLeaf(Map<UmiTypes, Object> levelsParam, UmiTypes leafType, String pattern) throws SQLException {
-        if (leafType == UmiTypes.Table) {
-            String schema = levelsParam == null ? null : StringUtils.toString(levelsParam.get(UmiTypes.Schema));
-            if (KafkaKeys.isGroupsSchema(schema)) {
-                return this.metadataSupplier.eGet().selectGroups();
-            }
-            return this.metadataSupplier.eGet().selectTables();
+        UmiTypes dimension = resolveDimension(levelsParam, leafType);
+        switch (dimension) {
+            case Topic:
+                return this.metadataSupplier.eGet().selectTopics(pattern);
+            case ConsumerGroup:
+                return this.metadataSupplier.eGet().selectConsumerGroups(pattern);
+            case Endpoint:
+                return this.metadataSupplier.eGet().selectBrokers(pattern);
+            default:
+                throw new UnsupportedOperationException("listLeaf of " + dimension + " Unsupported.");
         }
-        throw new UnsupportedOperationException("listLeaf of " + leafType + " Unsupported.");
     }
 
     @Override
     public Value detailLeaf(Map<UmiTypes, Object> levelsParam, UmiTypes leafType, String leafName) throws SQLException {
-        if (leafType == UmiTypes.Table) {
-            String schema = levelsParam == null ? null : StringUtils.toString(levelsParam.get(UmiTypes.Schema));
-            if (KafkaKeys.isGroupsSchema(schema)) {
-                return this.metadataSupplier.eGet().loadTable(KafkaKeys.SCHEMA_GROUPS, leafName);
-            }
-            return this.metadataSupplier.eGet().loadTable(KafkaKeys.SCHEMA_TOPICS, leafName);
+        UmiTypes dimension = resolveDimension(levelsParam, leafType);
+        switch (dimension) {
+            case Topic:
+                return this.metadataSupplier.eGet().loadTopic(leafName);
+            case ConsumerGroup:
+                return this.metadataSupplier.eGet().loadConsumerGroup(leafName);
+            case Endpoint:
+                return this.metadataSupplier.eGet().loadBroker(leafName);
+            default:
+                throw new UnsupportedOperationException("detailLeaf of " + dimension + " Unsupported.");
         }
-        throw new UnsupportedOperationException("detailLeaf of " + leafType + " Unsupported.");
+    }
+
+    /**
+     * Prefer the logical schema dimension (TOPIC/CONSUMER_GROUP/ENDPOINT), so opening ENDPOINT still works
+     * even if the UI default leafType is still TOPIC. Endpoint stands for Kafka Broker.
+     */
+    private static UmiTypes resolveDimension(Map<UmiTypes, Object> levelsParam, UmiTypes leafType) {
+        if (levelsParam != null) {
+            Object schemaObj = levelsParam.get(UmiTypes.Schema);
+            if (schemaObj != null) {
+                String schema = String.valueOf(schemaObj);
+                if (StringUtils.equalsIgnoreCase(schema, KafkaKeys.SCHEMA_TOPIC)) {
+                    return UmiTypes.Topic;
+                }
+                if (StringUtils.equalsIgnoreCase(schema, KafkaKeys.SCHEMA_CONSUMER_GROUP)) {
+                    return UmiTypes.ConsumerGroup;
+                }
+                if (StringUtils.equalsIgnoreCase(schema, KafkaKeys.SCHEMA_ENDPOINT)) {
+                    return UmiTypes.Endpoint;
+                }
+            }
+        }
+        if (leafType == null) {
+            return UmiTypes.Topic;
+        }
+        return leafType;
     }
 }

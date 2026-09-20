@@ -35,6 +35,7 @@ import com.clougence.clouddm.console.web.model.vo.browse.BrowseLevelsVO;
 import com.clougence.clouddm.console.web.service.browse.model.rdb.BrowseColumnMO;
 import com.clougence.clouddm.console.web.service.browse.model.rdb.BrowseObjectMO;
 import com.clougence.clouddm.console.web.service.datasource.DmDsWebService;
+import com.clougence.clouddm.console.web.service.envparam.DmEnvParamService;
 import com.clougence.clouddm.console.web.util.DmConvertUtils;
 import com.clougence.clouddm.platform.dal.access.DataSourceDal;
 import com.clougence.clouddm.platform.dal.model.datasource.DmDsDO;
@@ -42,10 +43,12 @@ import com.clougence.clouddm.platform.dal.model.datasource.DmDsTagDO;
 import com.clougence.clouddm.platform.plugin.PluginManager;
 import com.clougence.clouddm.sdk.execute.meta.DsElement;
 import com.clougence.clouddm.sdk.execute.session.rdb.RdbSupportSpi;
+import com.clougence.clouddm.sdk.model.env.EnvParamKeys;
 import com.clougence.schema.umi.special.rdb.*;
 import com.clougence.schema.umi.struts.UmiTypes;
 import com.clougence.schema.umi.struts.Value;
 import com.clougence.utils.CollectionUtils;
+import com.clougence.utils.StringUtils;
 
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +67,8 @@ public class BrowseServiceImpl implements BrowseService {
     private DmDsConfigService dmDsConfigService;
     @Resource
     private DsSchemaService   dmDsSchemaService;
+    @Resource
+    private DmEnvParamService dmEnvParamService;
 
     /**
      * for service API '/browse/listLevels'
@@ -107,12 +112,21 @@ public class BrowseServiceImpl implements BrowseService {
 
         Map<Long, DmDsDO> dataSourceStatusMap = getDataSourceStatusMap(dsList);
 
+        String consoleReadOnlyFlag = this.dmEnvParamService.queryParam(puid, Long.parseLong(envId), EnvParamKeys.DM_ALLOW_ALL_STATEMENTS);
+        boolean consoleReadOnly = StringUtils.equalsIgnoreCase("true", consoleReadOnlyFlag);
+
         return dsList.stream().map(dsDO -> {
             DataSourceConfig dsConfig = dsConfigMap.get(dsDO.getId());
             RdbSupportSpi supportSpi = dsRdbSupportMap.get(dsDO.getDataSourceType());
             String dsHost = dsHostMap.get(dsDO.getId());
             BrowseLevelsVO levelVO = DmConvertUtils.convertToBrowseLevelsVO(dsDO, dsConfig, dataSourceStatusMap.get(dsDO.getId()), supportSpi, dsHost);
             levelVO.setObjAlias(dsTagMap.get(dsDO.getId()));
+            boolean dsReadOnly = dsConfig != null && Boolean.TRUE.equals(dsConfig.getReadOnly());
+            if (levelVO.getObjAttr() == null) {
+                levelVO.setObjAttr(new HashMap<>());
+            }
+            levelVO.getObjAttr().put("consoleReadOnly", String.valueOf(consoleReadOnly));
+            levelVO.getObjAttr().put("readOnly", String.valueOf(consoleReadOnly || dsReadOnly));
             return levelVO;
         }).collect(Collectors.toList());
     }
@@ -192,6 +206,17 @@ public class BrowseServiceImpl implements BrowseService {
         BrowseLevelsVO levelVO = DmConvertUtils.convertToBrowseLevelsVO(detailDO, dsConfig, dmDsConfigDO, supportSpi, dsHost);
 
         levelVO.setObjAlias(dsTags != null ? dsTags.getInstanceDesc() : null);
+        boolean consoleReadOnly = false;
+        if (detailDO.getDsEnvId() != null) {
+            String consoleReadOnlyFlag = this.dmEnvParamService.queryParam(detailDO.getUid(), detailDO.getDsEnvId(), EnvParamKeys.DM_ALLOW_ALL_STATEMENTS);
+            consoleReadOnly = StringUtils.equalsIgnoreCase("true", consoleReadOnlyFlag);
+        }
+        boolean dsReadOnly = dsConfig != null && Boolean.TRUE.equals(dsConfig.getReadOnly());
+        if (levelVO.getObjAttr() == null) {
+            levelVO.setObjAttr(new HashMap<>());
+        }
+        levelVO.getObjAttr().put("consoleReadOnly", String.valueOf(consoleReadOnly));
+        levelVO.getObjAttr().put("readOnly", String.valueOf(consoleReadOnly || dsReadOnly));
         return levelVO;
     }
 

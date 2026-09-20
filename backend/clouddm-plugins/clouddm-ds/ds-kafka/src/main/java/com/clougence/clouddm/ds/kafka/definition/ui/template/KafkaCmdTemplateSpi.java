@@ -15,6 +15,9 @@
  */
 package com.clougence.clouddm.ds.kafka.definition.ui.template;
 
+import java.util.Collections;
+import java.util.List;
+
 import com.clougence.clouddm.ds.kafka.dialect.KafkaDialect;
 import com.clougence.clouddm.sdk.ui.template.AbstractCmdTemplateSpi;
 import com.clougence.clouddm.sdk.ui.template.CmdTemplateOption;
@@ -31,7 +34,7 @@ public class KafkaCmdTemplateSpi extends AbstractCmdTemplateSpi {
     }
 
     @Override
-    public String getQuickQueryByTable(CmdTemplateOption option) {
-        return "";
+    public List<String> getDropTable(CmdTemplateOption option) {
+        return Collections.emptyList();
     }
 }

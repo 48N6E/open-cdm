@@ -15,9 +15,9 @@
  */
 package com.clougence.clouddm.ds.kafka.language;
 
+import java.util.Collections;
 import java.util.Set;
 
-import com.clougence.clouddm.dsfamily.language.split.SplitStrategyCenter;
 import com.clougence.clouddm.sdk.language.AbstractRequest;
 import com.clougence.clouddm.sdk.language.DsLanguageSpi;
 import com.clougence.clouddm.sdk.language.DsLanguageSupport;
@@ -32,8 +32,6 @@ import com.clougence.clouddm.sdk.service.execute.MetaService;
 
 public class KafkaLanguageSpi implements DsLanguageSpi {
 
-    private final SplitStrategyCenter split = new SplitStrategyCenter();
-
     public KafkaLanguageSpi(MetaService metaService){
     }
 
@@ -47,7 +45,7 @@ public class KafkaLanguageSpi implements DsLanguageSpi {
 
     @Override
     public Set<DsLanguageSupport> supports() {
-        return Set.of(DsLanguageSupport.SPLIT);
+        return Set.of(DsLanguageSupport.COMPLETE, DsLanguageSupport.VALIDATE, DsLanguageSupport.SPLIT);
     }
 
     @Override
@@ -62,6 +60,8 @@ public class KafkaLanguageSpi implements DsLanguageSpi {
 
     @Override
     public SplitResult split(SplitRequest request) {
-        return this.split.split(request);
+        SplitResult result = initResult(request, new SplitResult());
+        result.setStatements(Collections.emptyList());
+        return result;
     }
 }

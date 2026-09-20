@@ -499,8 +499,9 @@ public class RowStorage implements Closeable {
                 }
             } else {
                 int fullSize = v.length();
-                String displayed = (fullSize > this.displayChars) ? v.substring(0, this.displayChars) : v;
-                return ResultSetValue.of(true, mask, displayed, fullSize - displayed.length(), fullSize);
+                boolean truncated = fullSize > this.displayChars;
+                String displayed = truncated ? v.substring(0, this.displayChars) : v;
+                return ResultSetValue.of(complete && !truncated, mask, displayed, fullSize - displayed.length(), fullSize);
             }
         }
     }

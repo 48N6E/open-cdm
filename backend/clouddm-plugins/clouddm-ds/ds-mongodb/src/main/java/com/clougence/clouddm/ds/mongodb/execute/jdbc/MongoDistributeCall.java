@@ -82,7 +82,7 @@ class MongoDistributeCall {
             case KILL_OP:
                 return ClientCallForCommand.runCommand(sync, client, func.toBson(), request, receive, "admin");
             case ADMIN_READ:
-                return ClientCallForCommand.runCommand(sync, client, func.toBson(), request, receive, ((MongoReadCommandFunc) func).getDatabase());
+                return ClientCallForCommand.runAdminRead(sync, client, (MongoReadCommandFunc) func, request, receive);
             default:
                 throw new UnsupportedOperationException();
         }

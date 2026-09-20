@@ -36,17 +36,13 @@ public class KafkaDsBrowseSpi extends AbstractDsBrowseSpi {
 
     @Override
     public Map<UmiTypes, List<UmiTypes>> getLeafGroupMap() {
-        return CollectionUtils.asMap(UmiTypes.Schema, Collections.singletonList(UmiTypes.Table));
+        List<UmiTypes> schemaLeaves = Arrays.asList(UmiTypes.Topic, UmiTypes.ConsumerGroup, UmiTypes.Endpoint);
+        return CollectionUtils.asMap(UmiTypes.Schema, schemaLeaves);
     }
 
     @Override
     protected Dialect dialect() {
         return KafkaDialect.INSTANCE;
-    }
-
-    @Override
-    public List<UmiTypes> getLeafExpand() {
-        return Collections.singletonList(UmiTypes.Table);
     }
 
     @Override
@@ -64,11 +60,10 @@ public class KafkaDsBrowseSpi extends AbstractDsBrowseSpi {
                 List<String> menus = RdbUiMenuDef.DEFAULT_RDB_SCHEMA;
                 return filterMenus(menus, Arrays.asList(MENU_BROWSE_SCHEMA_CREATE, MENU_BROWSE_TABLE_CREATE, MENU_BROWSE_SCHEMA_RENAME, MENU_BROWSE_SCHEMA_DROP));
             }
-            case RdbTable: {
-                List<String> menus = RdbUiMenuDef.DEFAULT_RDB_TABLE;
-                return filterMenus(menus, Arrays.asList(MENU_BROWSE_TABLE_CREATE, MENU_BROWSE_TRIGGER_CREATE, MENU_BROWSE_TABLE_ALTER, MENU_BROWSE_TABLE_DATA,
-                        MENU_BROWSE_PROPERTY, MENU_BROWSE_TABLE_TRUNCATE, MENU_BROWSE_TABLE_FAKER, MENU_BROWSE_TABLE_FAKER_INCREMENT, MENU_BROWSE_TABLE_GENERATE,
-                        MENU_BROWSE_TABLE_GET_DDL, MENU_BROWSE_PERMISSIONS));
+            case Topic:
+            case ConsumerGroup:
+            case Endpoint: {
+                return Collections.emptyList();
             }
             default:
                 return super.getMenus(targetType);

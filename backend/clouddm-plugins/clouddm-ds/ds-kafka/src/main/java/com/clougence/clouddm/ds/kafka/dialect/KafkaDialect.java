@@ -20,7 +20,7 @@ import com.clougence.utils.StringUtils;
 
 public class KafkaDialect extends AbstractDialect {
 
-    public static KafkaDialect INSTANCE = new KafkaDialect();
+    public static final KafkaDialect INSTANCE = new KafkaDialect();
 
     @Override
     protected String keyWordsResource() {

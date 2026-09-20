@@ -73,6 +73,7 @@ public enum MongoFuncType {
     RS_STATUS("rs.status", com.clougence.sql.mongodb.parser.ast.CommandType.ADMIN_READ, com.clougence.sql.mongodb.parser.ast.CmdKindType.READ),
     RS_CONF("rs.conf", com.clougence.sql.mongodb.parser.ast.CommandType.ADMIN_READ, com.clougence.sql.mongodb.parser.ast.CmdKindType.READ),
     RS_REPLICATION_INFO("rs.printReplicationInfo", com.clougence.sql.mongodb.parser.ast.CommandType.ADMIN_READ, com.clougence.sql.mongodb.parser.ast.CmdKindType.READ),
+    RS_PRINT_SECONDARY_REPLICATION_INFO("rs.printSecondaryReplicationInfo", com.clougence.sql.mongodb.parser.ast.CommandType.ADMIN_READ, com.clougence.sql.mongodb.parser.ast.CmdKindType.READ),
     SH_STATUS("sh.status", com.clougence.sql.mongodb.parser.ast.CommandType.ADMIN_READ, com.clougence.sql.mongodb.parser.ast.CmdKindType.READ),
     SH_BALANCER_STATUS("sh.balancerStatus", com.clougence.sql.mongodb.parser.ast.CommandType.ADMIN_READ, com.clougence.sql.mongodb.parser.ast.CmdKindType.READ);
 

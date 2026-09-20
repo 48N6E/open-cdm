@@ -23,6 +23,9 @@ import org.bson.Document;
 
 import com.clougence.drivers.adapter.AdapterReceive;
 import com.clougence.drivers.adapter.AdapterRequest;
+import com.clougence.drivers.adapter.AdapterResultCursor;
+import com.clougence.sql.mongodb.parser.ast.MongoFuncType;
+import com.clougence.sql.mongodb.parser.ast.commands.db.MongoReadCommandFunc;
 import com.clougence.utils.future.CgFuture;
 import com.mongodb.client.MongoClient;
 
@@ -31,8 +34,26 @@ public class ClientCallForCommand extends MongoUtils {
     public static CgFuture<?> runCommand(CgFuture<Object> sync, MongoClient client, String command, AdapterRequest request, AdapterReceive receive,
                                          String database) throws SQLException, IOException {
         Document result = client.getDatabase(database).runCommand(Document.parse(command));
-
+        // Expand document fields as columns (e.g. buildInfo.version for connectDs).
         return handleResult(sync, request, receive, new MongoResultBuffer(), Collections.singletonList(result).iterator());
+    }
+
+    public static CgFuture<?> runAdminRead(CgFuture<Object> sync, MongoClient client, MongoReadCommandFunc func, AdapterRequest request,
+                                           AdapterReceive receive) throws SQLException, IOException {
+        MongoFuncType funcType = func.getFuncType();
+        String output;
+        if (funcType == MongoFuncType.RS_PRINT_SECONDARY_REPLICATION_INFO) {
+            output = MongoShellPrintFormatter.printSecondaryReplicationInfo(client);
+        } else if (funcType == MongoFuncType.RS_REPLICATION_INFO) {
+            output = MongoShellPrintFormatter.printReplicationInfo(client);
+        } else {
+            Document result = client.getDatabase(func.getDatabase()).runCommand(Document.parse(func.toBson()));
+            output = MongoBsonJsonUtils.toShellJson(result);
+        }
+
+        AdapterResultCursor cursor = MongoUtils.singleResult(request, RESULT_COLUMN, output);
+        receive.responseResult(request, cursor);
+        return completed(sync);
     }
 
 }

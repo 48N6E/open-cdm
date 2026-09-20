@@ -87,7 +87,7 @@ class ImplResultSetMetaBuild extends AbstractResultBuild<ResultSetMeta> implemen
 
         if (useResultCache) {
             String localWsn = this.ss.getLocalWsn();
-            String cacheName = ("results" + File.separator + this.get().getResultId() + ".dat").toLowerCase();
+            String cacheName = ("results/" + this.get().getResultId() + ".dat").toLowerCase();
             String cacheFileUri = "wsn://" + localWsn + "/" + cacheName;
             result.setCacheFilePath(cacheName);
             result.setCacheFileUri(cacheFileUri);

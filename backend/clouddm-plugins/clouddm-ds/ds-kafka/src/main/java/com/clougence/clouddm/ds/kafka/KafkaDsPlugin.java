@@ -15,14 +15,15 @@
  */
 package com.clougence.clouddm.ds.kafka;
 
+import com.clougence.adapter.kafka.KafkaTypes;
 import com.clougence.clouddm.base.metadata.ds.DataSourceType;
 import com.clougence.clouddm.ds.kafka.definition.secrules.KafkaSecRulesSupportSpi;
 import com.clougence.clouddm.ds.kafka.definition.ui.browser.KafkaDsBrowseSpi;
-import com.clougence.clouddm.ds.kafka.definition.ui.exception.KafkaDetermineExceptionSpi;
 import com.clougence.clouddm.ds.kafka.definition.ui.template.KafkaCmdTemplateSpi;
 import com.clougence.clouddm.ds.kafka.dialect.KafkaDialect;
 import com.clougence.clouddm.ds.kafka.dsconf.KafkaConfigSpi;
 import com.clougence.clouddm.ds.kafka.dsconf.KafkaSerializationSpi;
+import com.clougence.clouddm.ds.kafka.execute.KafkaOpsSpiImpl;
 import com.clougence.clouddm.ds.kafka.execute.KafkaSessionFactory;
 import com.clougence.clouddm.ds.kafka.execute.KafkaSessionSpi;
 import com.clougence.clouddm.ds.kafka.execute.KafkaSupportSpi;
@@ -48,6 +49,7 @@ public class KafkaDsPlugin implements DsPlugin, SchemaPlugin {
     @Override
     public void init(SchemaBinder binder) {
         binder.initMappingService(DsType.Kafka);
+        binder.bindTypes(DsType.Kafka, KafkaTypes.values(), KafkaTypes::valueOfCode);
     }
 
     @Override
@@ -69,10 +71,11 @@ public class KafkaDsPlugin implements DsPlugin, SchemaPlugin {
     private void configExecute(DsPluginBinder dsPlugin) {
         dsPlugin.bindDsSessionFactory(KafkaSessionFactory.class);
         dsPlugin.bindDsDriverFamily("Kafka Clients");
-        dsPlugin.bindSqlEngine("Kafka Commands");
+        // no bindSqlEngine: object tree is the primary interaction in milestone-1
 
         dsPlugin.addPluginSpi(new KafkaSessionSpi());
         dsPlugin.addPluginSpi(new KafkaSupportSpi());
+        dsPlugin.addPluginSpi(new KafkaOpsSpiImpl());
     }
 
     private void configUi(DsPluginBinder dsPlugin) {
@@ -81,7 +84,6 @@ public class KafkaDsPlugin implements DsPlugin, SchemaPlugin {
         dsPlugin.bindDsDialect(KafkaDialect.INSTANCE);
         dsPlugin.addPluginSpi(new KafkaDsBrowseSpi());
         dsPlugin.addPluginSpi(new KafkaCmdTemplateSpi());
-        dsPlugin.addPluginSpi(new KafkaDetermineExceptionSpi());
     }
 
     private void configEditor(DsPluginBinder dsPlugin) {

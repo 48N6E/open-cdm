@@ -2943,6 +2943,9 @@ export default {
         case TABLE_RIGHT_CLICK_MENU_ITEM.MENU_BROWSE_COPY_NAME:
           this.copyText(this.selectedNode.objName || this.selectedNode.title);
           break;
+        case TABLE_RIGHT_CLICK_MENU_ITEM.MENU_BROWSE_PERMISSIONS:
+          this.$router.push({ path: '/system/permission', query: { type: 'apply' } });
+          break;
         case TABLE_RIGHT_CLICK_MENU_ITEM.MENU_BROWSE_TABLE_FAKER:
         case TABLE_RIGHT_CLICK_MENU_ITEM.MENU_BROWSE_TABLE_FAKER_INCREMENT:
           this.genDataModal.title =

@@ -17,6 +17,8 @@ package com.clougence.clouddm.ds.kafka.execute.dsfactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 import com.clougence.clouddm.ds.kafka.execute.jdbc.KafkaKeys;
@@ -45,6 +47,9 @@ public class KafkaJdbcDsFactory implements DsFactory<Connection> {
         String connTimeoutMs = dsConfig.getProperty(DsConfigKeys.CONNECT_TIMEOUT_MS.getConfigKey());
         String soTimeoutSec = dsConfig.getProperty(DsConfigKeys.SO_TIMEOUT_SEC.getConfigKey());
         String clientName = dsConfig.getProperty(DsConfigKeys.CLIENT_NAME.getConfigKey());
+        String defaultSchema = dsConfig.getProperty(DsConfigKeys.DEFAULT_SCHEMA.getConfigKey());
+        String driverVersion = dsConfig.getProperty(DsConfigKeys.DRIVER_VERSION.getConfigKey());
+
         if (StringUtils.isNotBlank(username)) {
             props.put(KafkaKeys.USERNAME, username);
         }
@@ -54,29 +59,69 @@ public class KafkaJdbcDsFactory implements DsFactory<Connection> {
         if (StringUtils.isNotBlank(clientName)) {
             props.put(KafkaKeys.CLIENT_NAME, clientName.replace(" ", "-"));
         }
+        if (StringUtils.isNotBlank(defaultSchema)) {
+            props.put(KafkaKeys.DATABASE, defaultSchema);
+        } else {
+            props.put(KafkaKeys.DATABASE, KafkaKeys.DEFAULT_SCHEMA);
+        }
         if (StringUtils.isNotBlank(connTimeoutMs)) {
             props.put(KafkaKeys.CONN_TIMEOUT, connTimeoutMs);
         }
         if (StringUtils.isNotBlank(soTimeoutSec)) {
             props.put(KafkaKeys.SO_TIMEOUT, String.valueOf(Long.parseLong(soTimeoutSec) * 1000));
         }
+        if (StringUtils.isNotBlank(driverVersion)) {
+            props.put(KafkaKeys.DRIVER_VERSION, driverVersion);
+        }
 
-        String jdbcUrl = buildJdbcUrl(dsConfig);
+        String bootstrap = buildBootstrap(dsConfig);
+        props.put(KafkaKeys.SERVER, bootstrap);
+        props.put(KafkaKeys.BOOTSTRAP_SERVERS, bootstrap);
+
+        String jdbcUrl = KafkaKeys.START_URL + "//" + bootstrap;
         try {
             Connection connection = new JdbcDriver().connect(jdbcUrl, props);
             return new DsObject<>(dsConfig, connection, this);
         } catch (Exception e) {
-            log.error("create Kafka connection failed, instanceId=" + id + ", jdbcUrl=" + jdbcUrl, e);
-            throw e instanceof SQLException ? (SQLException) e : new SQLException(e);
+            log.error("create Kafka connection failed, instanceId=" + id + ", bootstrap=" + bootstrap, e);
+            throw e;
         }
     }
 
-    protected String buildJdbcUrl(Properties dsConfig) {
-        String jdbcUrl = dsConfig.getProperty(DsConfigKeys.CUSTOM_URL.getConfigKey());
-        if (StringUtils.isNotBlank(jdbcUrl)) {
-            return jdbcUrl;
+    private static String buildBootstrap(Properties dsConfig) {
+        String customUrl = dsConfig.getProperty(DsConfigKeys.CUSTOM_URL.getConfigKey());
+        if (StringUtils.isNotBlank(customUrl)) {
+            if (customUrl.startsWith(KafkaKeys.START_URL)) {
+                String rest = customUrl.substring(KafkaKeys.START_URL.length());
+                if (rest.startsWith("//")) {
+                    rest = rest.substring(2);
+                }
+                return rest;
+            }
+            return customUrl;
         }
+
         String host = dsConfig.getProperty(DsConfigKeys.HOST.getConfigKey());
-        return KafkaKeys.START_URL + host;
+        if (StringUtils.isBlank(host)) {
+            throw new IllegalArgumentException("Kafka host/bootstrap is required.");
+        }
+
+        String[] parts = host.split(",");
+        List<String> servers = new ArrayList<>();
+        for (String part : parts) {
+            String item = part.trim();
+            if (StringUtils.isBlank(item)) {
+                continue;
+            }
+            if (item.contains(":")) {
+                servers.add(item);
+            } else {
+                servers.add(item + ":" + KafkaKeys.DEFAULT_PORT);
+            }
+        }
+        if (servers.isEmpty()) {
+            throw new IllegalArgumentException("unsupported Kafka host format:" + host);
+        }
+        return StringUtils.join(servers, ",");
     }
 }

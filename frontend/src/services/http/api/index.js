@@ -54,8 +54,10 @@ import { taskTemplateApi } from '@/services/http/api/taskTemplate';
 import { taskTemplateDetailApi } from '@/services/http/api/taskTemplateDetail';
 import { metaSchemaApi } from '@/services/http/api/metaSchema';
 import { sshConfigApi } from '@/services/http/api/sshConfig';
+import { kafkaApi } from '@/services/http/api/kafka';
 
 export const api = {
+  ...kafkaApi,
   ...authApi,
   ...browseApi,
   ...editorApi,

@@ -31,6 +31,9 @@ import com.clougence.clouddm.sdk.execute.session.SessionContextDTO;
 import com.clougence.clouddm.sdk.execute.session.SessionHook;
 import com.clougence.clouddm.sdk.execute.session.rdb.RdbIsolation;
 import com.clougence.clouddm.sdk.execute.session.result.ColReader;
+import com.clougence.drivers.adapter.AdapterConnManager;
+import com.clougence.drivers.adapter.AdapterConnection;
+import com.clougence.utils.ExceptionUtils;
 import com.clougence.utils.StringUtils;
 
 public class KafkaHooks implements SessionHook {
@@ -59,7 +62,9 @@ public class KafkaHooks implements SessionHook {
 
     @Override
     public void setCurrentSchema(Connection conn, String schemaName) throws SQLException {
-        conn.setSchema(schemaName);
+        if (StringUtils.isNotBlank(schemaName)) {
+            conn.setSchema(schemaName);
+        }
     }
 
     @Override
@@ -122,12 +127,31 @@ public class KafkaHooks implements SessionHook {
 
     @Override
     public String getQueryID(Connection conn) throws SQLException {
-        return conn.unwrap(KafkaConnection.class).getObjectId();
+        AdapterConnection adapterConn = conn.unwrap(AdapterConnection.class);
+        if (adapterConn == null) {
+            throw new SQLException("failed to unwrap AdapterConnection from " + conn.getClass().getName());
+        }
+        return adapterConn.getObjectId();
     }
 
     @Override
     public void killProcess(Connection conn, String connID) throws SQLException {
-        conn.unwrap(KafkaConnection.class).killDriverConnection(connID);
+        AdapterConnection target = AdapterConnManager.getConnection(connID);
+        if (target instanceof KafkaConnection) {
+            ((KafkaConnection) target).killDriverConnection(connID);
+            return;
+        }
+        if (target != null) {
+            try {
+                target.close();
+            } catch (Throwable e) {
+                Throwable root = ExceptionUtils.getRootCause(e);
+                if (root instanceof SQLException) {
+                    throw (SQLException) root;
+                }
+                throw new SQLException(e);
+            }
+        }
     }
 
     @Override
@@ -139,14 +163,16 @@ public class KafkaHooks implements SessionHook {
         if (columnName == null || columnName.isEmpty()) {
             columnName = metaData.getColumnName(columnIndex);
         }
+
         int type = metaData.getColumnType(columnIndex);
         String columnTypeName = metaData.getColumnTypeName(columnIndex);
+
         ColMetaData colMetaData = new ColMetaData();
         colMetaData.setCatalog(catalogName);
         colMetaData.setSchema(schemaName);
         colMetaData.setTable(tableName);
         colMetaData.setColumn(columnName);
-        colMetaData.setColumnType(columnTypeName.toLowerCase());
+        colMetaData.setColumnType(columnTypeName == null ? "" : columnTypeName.toLowerCase());
         try {
             colMetaData.setJdbcType(JDBCType.valueOf(type));
         } catch (Exception e) {

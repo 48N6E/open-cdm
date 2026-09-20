@@ -20,7 +20,6 @@ import java.sql.SQLException;
 import java.util.*;
 
 import org.bson.Document;
-import org.bson.types.Binary;
 
 import com.clougence.drivers.adapter.AdapterCursor;
 import com.clougence.drivers.adapter.AdapterRequest;
@@ -68,15 +67,7 @@ public class MongoResultCursor implements AdapterCursor {
         if (iterator.hasNext()) {
             Document next = this.iterator.next();
             HashMap<String, Object> map = new HashMap<>();
-            next.forEach((k, v) -> {
-                if (v instanceof Document) {
-                    map.put(k, ((Document) v).toJson());
-                } else if (v instanceof Binary) {
-                    map.put(k, ((Binary) v).getData());
-                } else {
-                    map.put(k, v);
-                }
-            });
+            next.forEach((k, v) -> map.put(k, MongoBsonJsonUtils.toJdbcValue(v)));
             this.currentRow = map;
             return true;
         } else {

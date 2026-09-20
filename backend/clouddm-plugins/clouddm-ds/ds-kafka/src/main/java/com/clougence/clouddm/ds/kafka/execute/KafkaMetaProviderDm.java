@@ -15,18 +15,18 @@
  */
 package com.clougence.clouddm.ds.kafka.execute;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import com.clougence.clouddm.ds.kafka.execute.jdbc.KafkaKeys;
 import com.clougence.clouddm.dsfamily.execute.AbstractMetadataProvider;
+import com.clougence.drivers.adapter.AdapterConnection;
 import com.clougence.schema.metadata.MetaDataService;
 import com.clougence.schema.umi.special.rdb.RdbColumn;
 import com.clougence.schema.umi.special.rdb.RdbForeignKey;
@@ -41,8 +41,13 @@ import com.clougence.utils.ExceptionUtils;
 
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Plugin-CL metadata facade. Real AdminClient work runs in {@code KafkaMetaAdmin} on the driver ClassLoader.
+ */
 @Slf4j
 public class KafkaMetaProviderDm extends AbstractMetadataProvider implements MetaDataService {
+
+    private static final String META_ADMIN = "com.clougence.clouddm.ds.kafka.execute.jdbc.KafkaMetaAdmin";
 
     public KafkaMetaProviderDm(Connection connection){
         super(connection);
@@ -50,15 +55,8 @@ public class KafkaMetaProviderDm extends AbstractMetadataProvider implements Met
 
     @Override
     public String getVersion() {
-        try (Connection conn = this.connectSupplier.eGet(); PreparedStatement ps = conn.prepareStatement("DESCRIBE CLUSTER")) {
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    if ("clusterId".equals(rs.getString("NAME"))) {
-                        return rs.getString("VALUE");
-                    }
-                }
-                return "kafka";
-            }
+        try (Connection conn = this.connectSupplier.eGet()) {
+            return (String) invoke(conn, "getVersion", new Class<?>[] { Connection.class }, conn);
         } catch (Exception e) {
             String msg = "getVersion failed, " + ExceptionUtils.getRootCauseMessage(e);
             log.error(msg, e);
@@ -66,70 +64,130 @@ public class KafkaMetaProviderDm extends AbstractMetadataProvider implements Met
         }
     }
 
-    public List<Value> selectSchemas() {
-        RdbValue topics = new RdbValue();
-        topics.setUmiType(UmiTypes.Schema);
-        topics.setValue(KafkaKeys.SCHEMA_TOPICS);
-        RdbValue groups = new RdbValue();
-        groups.setUmiType(UmiTypes.Schema);
-        groups.setValue(KafkaKeys.SCHEMA_GROUPS);
-        List<Value> result = new ArrayList<>();
-        result.add(topics);
-        result.add(groups);
+    public List<Value> selectSchemas() throws SQLException {
+        List<Value> result = new ArrayList<>(3);
+        result.add(schemaValue(KafkaKeys.SCHEMA_TOPIC));
+        result.add(schemaValue(KafkaKeys.SCHEMA_CONSUMER_GROUP));
+        result.add(schemaValue(KafkaKeys.SCHEMA_ENDPOINT));
         return result;
     }
 
-    public List<Value> selectTables() throws SQLException {
-        try (Connection conn = this.connectSupplier.eGet(); PreparedStatement ps = conn.prepareStatement("SHOW TOPICS")) {
-            try (ResultSet rs = ps.executeQuery()) {
-                List<Value> result = new ArrayList<>();
-                while (rs.next()) {
-                    RdbValue value = new RdbValue();
-                    value.setUmiType(UmiTypes.Table);
-                    value.setValue(rs.getString("TOPIC"));
-                    result.add(value);
-                }
-                result.sort((o1, o2) -> ((RdbValue) o1).getValue().compareTo(((RdbValue) o2).getValue()));
-                return result;
-            }
+    private static RdbValue schemaValue(String name) {
+        RdbValue value = new RdbValue();
+        value.setValue(name);
+        value.setUmiType(UmiTypes.Schema);
+        return value;
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Value> selectTopics(String pattern) throws SQLException {
+        try (Connection conn = this.connectSupplier.eGet()) {
+            return (List<Value>) invoke(conn, "selectTopics", new Class<?>[] { Connection.class, String.class }, conn, pattern);
+        } catch (SQLException e) {
+            throw e;
+        } catch (Exception e) {
+            throw toSqlException("list topics failed", e);
         }
     }
 
-    public List<Value> selectGroups() throws SQLException {
-        try (Connection conn = this.connectSupplier.eGet(); PreparedStatement ps = conn.prepareStatement("SHOW GROUPS")) {
-            try (ResultSet rs = ps.executeQuery()) {
-                List<Value> result = new ArrayList<>();
-                while (rs.next()) {
-                    RdbValue value = new RdbValue();
-                    value.setUmiType(UmiTypes.Table);
-                    value.setValue(rs.getString("GROUP_ID"));
-                    result.add(value);
-                }
-                result.sort((o1, o2) -> ((RdbValue) o1).getValue().compareTo(((RdbValue) o2).getValue()));
-                return result;
-            }
+    @SuppressWarnings("unchecked")
+    public List<Value> selectConsumerGroups(String pattern) throws SQLException {
+        try (Connection conn = this.connectSupplier.eGet()) {
+            return (List<Value>) invoke(conn, "selectConsumerGroups", new Class<?>[] { Connection.class, String.class }, conn, pattern);
+        } catch (SQLException e) {
+            throw e;
+        } catch (Exception e) {
+            throw toSqlException("list consumer groups failed", e);
         }
     }
 
-    public Value loadTable(String tableName) {
-        return loadTable(KafkaKeys.SCHEMA_TOPICS, tableName);
+    @SuppressWarnings("unchecked")
+    public List<Value> selectBrokers(String pattern) throws SQLException {
+        try (Connection conn = this.connectSupplier.eGet()) {
+            return (List<Value>) invoke(conn, "selectBrokers", new Class<?>[] { Connection.class, String.class }, conn, pattern);
+        } catch (SQLException e) {
+            throw e;
+        } catch (Exception e) {
+            throw toSqlException("list brokers failed", e);
+        }
     }
 
-    public Value loadTable(String schema, String tableName) {
-        RdbTable rdbTable = new RdbTable();
-        rdbTable.setSchema(schema);
-        rdbTable.setName(tableName);
-        return rdbTable;
+    public Value loadTopic(String topicName) throws SQLException {
+        try (Connection conn = this.connectSupplier.eGet()) {
+            return (Value) invoke(conn, "loadTopic", new Class<?>[] { Connection.class, String.class }, conn, topicName);
+        } catch (SQLException e) {
+            throw e;
+        } catch (Exception e) {
+            throw toSqlException("describe topic failed", e);
+        }
+    }
+
+    public Value loadConsumerGroup(String groupId) throws SQLException {
+        try (Connection conn = this.connectSupplier.eGet()) {
+            return (Value) invoke(conn, "loadConsumerGroup", new Class<?>[] { Connection.class, String.class }, conn, groupId);
+        } catch (SQLException e) {
+            throw e;
+        } catch (Exception e) {
+            throw toSqlException("describe consumer group failed", e);
+        }
+    }
+
+    public Value loadBroker(String brokerName) throws SQLException {
+        try (Connection conn = this.connectSupplier.eGet()) {
+            return (Value) invoke(conn, "loadBroker", new Class<?>[] { Connection.class, String.class }, conn, brokerName);
+        } catch (SQLException e) {
+            throw e;
+        } catch (Exception e) {
+            throw toSqlException("describe broker failed", e);
+        }
+    }
+
+    public void testConnect() throws SQLException {
+        try (Connection conn = this.connectSupplier.eGet()) {
+            invoke(conn, "testConnect", new Class<?>[] { Connection.class }, conn);
+        } catch (SQLException e) {
+            throw e;
+        } catch (Exception e) {
+            throw toSqlException("testConnect failed", e);
+        }
+    }
+
+    private static Object invoke(Connection connection, String methodName, Class<?>[] parameterTypes, Object... args) throws Exception {
+        try {
+            ClassLoader driverCl = resolveDriverClassLoader(connection);
+            Class<?> metaType = Class.forName(META_ADMIN, true, driverCl);
+            Method method = metaType.getMethod(methodName, parameterTypes);
+            return method.invoke(null, args);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause() == null ? e : e.getCause();
+            if (cause instanceof Exception) {
+                throw (Exception) cause;
+            }
+            throw new Exception(cause);
+        }
+    }
+
+    private static ClassLoader resolveDriverClassLoader(Connection connection) throws SQLException {
+        AdapterConnection adapter = connection.unwrap(AdapterConnection.class);
+        if (adapter != null && adapter.getClass().getClassLoader() != null) {
+            return adapter.getClass().getClassLoader();
+        }
+        ClassLoader cl = connection.getClass().getClassLoader();
+        if (cl == null) {
+            cl = Thread.currentThread().getContextClassLoader();
+        }
+        return cl;
+    }
+
+    private static SQLException toSqlException(String message, Exception e) {
+        String msg = message + ", " + ExceptionUtils.getRootCauseMessage(e);
+        log.error(msg, e);
+        return new SQLException(msg, e);
     }
 
     @Override
     protected List<RdbTable> fetchTableByPart(Connection conn, String catalog, String schema, List<String> tabs) {
-        return tabs.stream().map(tab -> {
-            RdbTable rdbTable = new RdbTable();
-            rdbTable.setName(tab);
-            rdbTable.setSchema(schema);
-            return rdbTable;
-        }).collect(Collectors.toList());
+        return Collections.emptyList();
     }
 
     @Override

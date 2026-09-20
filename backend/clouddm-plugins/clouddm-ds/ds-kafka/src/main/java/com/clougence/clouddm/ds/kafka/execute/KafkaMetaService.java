@@ -16,14 +16,11 @@
 package com.clougence.clouddm.ds.kafka.execute;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 
-import com.clougence.clouddm.ds.kafka.execute.jdbc.KafkaConnection;
 import com.clougence.clouddm.sdk.execute.session.Session;
 import com.clougence.clouddm.sdk.execute.session.rdb.DefaultRdbMetaService;
 import com.clougence.clouddm.sdk.execute.session.rdb.DmRdbUmiService;
+import com.clougence.drivers.adapter.AdapterConnection;
 import com.clougence.schema.editor.provider.SqlBuilder;
 import com.clougence.utils.ExceptionUtils;
 
@@ -50,7 +47,13 @@ public class KafkaMetaService extends DefaultRdbMetaService {
     @Override
     public String getCurrentSchema() {
         try {
-            return this.rdbSession.executeQuery(con -> con.unwrap(KafkaConnection.class).getSchema());
+            return this.rdbSession.executeQuery(con -> {
+                AdapterConnection adapterConn = con.unwrap(AdapterConnection.class);
+                if (adapterConn == null) {
+                    throw new java.sql.SQLException("failed to unwrap AdapterConnection from " + con.getClass().getName());
+                }
+                return adapterConn.getSchema();
+            });
         } catch (Exception e) {
             String msg = "getCurrentSchema failed, " + ExceptionUtils.getRootCauseMessage(e);
             log.error(msg, e);
@@ -62,11 +65,8 @@ public class KafkaMetaService extends DefaultRdbMetaService {
     public void testConnect() {
         try {
             this.rdbSession.executeQuery(con -> {
-                try (PreparedStatement ps = con.prepareStatement("SHOW TOPICS")) {
-                    try (ResultSet rs = ps.executeQuery()) {
-                        return "OK.";
-                    }
-                }
+                new KafkaMetaProviderDm(con).testConnect();
+                return "OK.";
             });
         } catch (Exception e) {
             String msg = "testConnect failed, " + ExceptionUtils.getRootCauseMessage(e);

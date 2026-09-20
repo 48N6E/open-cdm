@@ -21,7 +21,7 @@ import com.clougence.clouddm.base.metadata.ds.ConfigDef;
 import com.clougence.clouddm.base.metadata.ds.DataSourceConfig;
 import com.clougence.clouddm.base.metadata.ds.DataSourceType;
 import com.clougence.clouddm.base.metadata.ds.DsConfigGroup;
-import com.clougence.clouddm.base.metadata.ds.SslMode;
+import com.clougence.clouddm.base.metadata.ds.SecurityType;
 import com.clougence.clouddm.ds.kafka.execute.jdbc.KafkaKeys;
 import com.clougence.clouddm.ds.kafka.i18n.KafkaConfigI18nKeys;
 import com.clougence.clouddm.sdk.execute.dsconf.Serialization;
@@ -37,23 +37,25 @@ import lombok.experimental.FieldNameConstants;
 @Getter
 @Setter
 @FieldNameConstants
-@Serialization(provider = KafkaSerializationSpi.PROVIDER_NAME)
+@Serialization(provider = "Kafka")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class KafkaConfig extends DataSourceConfig {
 
-    @ConfigDef(name = Fields.saslMechanism, defaultValue = "PLAIN", //
-            group = DsConfigGroup.GENERAL, labelKey = KafkaConfigI18nKeys.CONFIG_KAFKA_SASL_MECHANISM_LABEL, descKey = KafkaConfigI18nKeys.CONFIG_KAFKA_SASL_MECHANISM_DESC, readOnly = false)
-    private String  saslMechanism;
+    /** Object-tree logical schema; not shown in auth UI. */
+    private String  defaultSchema = KafkaKeys.DEFAULT_SCHEMA;
+
     @ConfigDef(name = Fields.connectTimeoutMs, defaultValue = "5000", //
             group = DsConfigGroup.ADVANCED, labelKey = KafkaConfigI18nKeys.CONFIG_RDB_CONN_TIMEOUT_MS_LABEL, descKey = KafkaConfigI18nKeys.CONFIG_RDB_CONN_TIMEOUT_MS_DESC, readOnly = false)
     private Long    connectTimeoutMs;
-    @ConfigDef(name = Fields.soTimeoutSec, defaultValue = "10", //
+
+    @ConfigDef(name = Fields.soTimeoutSec, defaultValue = "30", //
             group = DsConfigGroup.ADVANCED, labelKey = KafkaConfigI18nKeys.CONFIG_DS_SO_TIMEOUT_MS_LABEL, descKey = KafkaConfigI18nKeys.CONFIG_DS_SO_TIMEOUT_MS_DESC, readOnly = false)
     private Integer soTimeoutSec;
 
     public KafkaConfig(){
         setDataSourceType(DataSourceType.Kafka);
-        setSaslMechanism("PLAIN");
+        setSecurityType(SecurityType.NONE);
+        setDefaultSchema(KafkaKeys.DEFAULT_SCHEMA);
     }
 
     public Properties asDriverProperties() {
@@ -63,19 +65,17 @@ public class KafkaConfig extends DataSourceConfig {
         properties.setProperty(DsConfigKeys.HOST.getConfigKey(), safeStr(this.getHost()));
         properties.setProperty(DsConfigKeys.USER.getConfigKey(), safeStr(this.getUserName()));
         properties.setProperty(DsConfigKeys.PASSWORD.getConfigKey(), safeStr(this.getPassword()));
+        properties.setProperty(DsConfigKeys.DEFAULT_SCHEMA.getConfigKey(), safeStr(StringUtils.defaultIfBlank(this.getDefaultSchema(), KafkaKeys.DEFAULT_SCHEMA)));
         properties.setProperty(DsConfigKeys.CONNECT_TIMEOUT_MS.getConfigKey(), safeStr(StringUtils.toString(this.getConnectTimeoutMs())));
         properties.setProperty(DsConfigKeys.SO_TIMEOUT_SEC.getConfigKey(), safeStr(StringUtils.toString(this.getSoTimeoutSec())));
-        properties.setProperty(KafkaKeys.SASL_MECHANISM, safeStr(this.getSaslMechanism()));
-        SslMode sslMode = this.getSslMode();
-        if (sslMode == null) {
-            sslMode = SslMode.DISABLED;
-        }
-        properties.setProperty(KafkaKeys.SSL_MODE, sslMode.name());
-        properties.setProperty(KafkaKeys.SSL_CA_FILE, safeStr(this.getSslCaFilePath()));
-        properties.setProperty(KafkaKeys.SSL_CA_PASSWORD, safeStr(this.getSslCaPassword()));
-        properties.setProperty(KafkaKeys.SSL_CLIENT_CERT_FILE, safeStr(this.getSslClientCertFilePath()));
-        properties.setProperty(KafkaKeys.SSL_CLIENT_KEY_FILE, safeStr(this.getSslClientKeyFilePath()));
-        properties.setProperty(KafkaKeys.SSL_CLIENT_KEY_PASSWORD, safeStr(this.getSslClientKeyPassword()));
+        properties.setProperty(KafkaKeys.SECURITY_PROTOCOL, resolveSecurityProtocol());
         return properties;
+    }
+
+    private String resolveSecurityProtocol() {
+        if (this.getSecurityType() == SecurityType.USER_PASSWD) {
+            return "SASL_PLAINTEXT";
+        }
+        return KafkaKeys.DEFAULT_SECURITY_PROTOCOL;
     }
 }

@@ -16,6 +16,7 @@
 package com.clougence.clouddm.api.console.configs;
 
 import java.util.List;
+import java.util.Map;
 
 import com.clougence.clouddm.base.metadata.ds.DataSourceConfig;
 import com.clougence.clouddm.base.metadata.ds.SshConfig;
@@ -33,6 +34,8 @@ public interface ConfigRService {
     List<ConfigData> fetchSettings(List<String> names);
 
     DataSourceConfig fetchDsConfig(long dsId);
+
+    DataSourceConfig fetchDsConfig(long dsId, Map<String, String> configOverrides);
 
     List<ConfigData> fetchDsConfig(String instanceId, List<String> names);
 

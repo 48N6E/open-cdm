@@ -79,6 +79,7 @@ import com.clougence.clouddm.platform.dal.model.system.SysAttachmentType;
 import com.clougence.clouddm.platform.dal.util.PageObj;
 import com.clougence.clouddm.platform.dal.util.PageUtils;
 import com.clougence.clouddm.platform.plugin.PluginManager;
+import com.clougence.clouddm.sdk.execute.dsconf.DsConfigField;
 import com.clougence.clouddm.sdk.execute.session.QueryRequest;
 import com.clougence.clouddm.sdk.execute.session.QueryResultConf;
 import com.clougence.clouddm.sdk.execute.session.SessionContextDTO;
@@ -484,17 +485,30 @@ public class AutoExecServiceImpl implements AutoExecService {
         job4Auto.setRetryWaitTime(job.getConfig().getRetryWaitTime());
         job4Auto.setEnableTransactional(job.getConfig().isEnableTransactional());
         DmDsDO dsDO = this.dsDal.dsMapper().queryDsIdentityById(job.getDataSourceId());
-        DataSourceConfig dsConfig = this.configService.fetchDsConfigFromExists(dsDO.getId());
-
         List<String> levels = new ArrayList<>();
         levels.add(dsDO.getDsEnvId().toString());
         levels.add(dsDO.getId().toString());
         levels.addAll(job.getLevels());
         Map<UmiTypes, Object> levelsParam = this.configService.parseLevels(levels).levelsParam();
 
+        Map<String, String> configOverrides = new HashMap<>();
+        String catalog = StringUtils.toString(levelsParam.get(UmiTypes.Catalog));
+        String schema = StringUtils.toString(levelsParam.get(UmiTypes.Schema));
+        if (StringUtils.isNotBlank(catalog)) {
+            configOverrides.put(DsConfigField.DEFAULT_DATABASE.getConfigName(), catalog);
+        }
+        if (StringUtils.isNotBlank(schema)) {
+            configOverrides.put(DsConfigField.DEFAULT_SCHEMA.getConfigName(), schema);
+        }
+        DataSourceConfig dsConfig = this.configService.fetchDsConfigFromExists(dsDO.getId(), configOverrides);
+
         Map<String, Object> params = new HashMap<>();
-        params.put(SessionSpi.PARAMS_DEFAULT_DB, StringUtils.toString(levelsParam.get(UmiTypes.Catalog)));
-        params.put(SessionSpi.PARAMS_DEFAULT_SCHEMA, StringUtils.toString(levelsParam.get(UmiTypes.Schema)));
+        if (StringUtils.isNotBlank(catalog)) {
+            params.put(SessionSpi.PARAMS_DEFAULT_DB, catalog);
+        }
+        if (StringUtils.isNotBlank(schema)) {
+            params.put(SessionSpi.PARAMS_DEFAULT_SCHEMA, schema);
+        }
         SessionSpi sessionSpi = PluginManager.findSessionSpi(dsDO.getDataSourceType());
         SessionContextDTO contextDTO = sessionSpi.createSessionContext(dsConfig, params);
 

@@ -19,9 +19,11 @@ import static com.clougence.clouddm.base.metadata.ui.form.UiUtils.fieldOptionDef
 import static com.clougence.clouddm.base.metadata.ui.form.UiUtils.strValueDef;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import com.clougence.clouddm.base.metadata.ds.ConfigI18nKey;
 import com.clougence.clouddm.base.metadata.ds.DataSourceConfig;
 import com.clougence.clouddm.base.metadata.ds.DsConfigGroup;
 import com.clougence.clouddm.base.metadata.ds.SecurityType;
@@ -30,6 +32,7 @@ import com.clougence.clouddm.base.metadata.ui.form.UiPanel;
 import com.clougence.clouddm.base.metadata.ui.form.UiPanelField;
 import com.clougence.clouddm.base.metadata.ui.form.UiPanelFieldType;
 import com.clougence.clouddm.base.metadata.ui.form.value.ValueDef;
+import com.clougence.clouddm.ds.kafka.execute.jdbc.KafkaKeys;
 import com.clougence.clouddm.ds.kafka.i18n.KafkaConfigI18nKeys;
 import com.clougence.clouddm.dsfamily.dsconf.AbstractDsConfigSpi;
 import com.clougence.drivers.adapter.ConvertUtils;
@@ -39,7 +42,7 @@ public class KafkaConfigSpi extends AbstractDsConfigSpi {
 
     @Override
     public String defaultPort() {
-        return "9092";
+        return String.valueOf(KafkaKeys.DEFAULT_PORT);
     }
 
     @Override
@@ -52,36 +55,14 @@ public class KafkaConfigSpi extends AbstractDsConfigSpi {
         KafkaConfig config = (KafkaConfig) dsConfig;
         Long connectTimeoutMs = ConvertUtils.toLong(defaultConfig.get(KafkaConfig.Fields.connectTimeoutMs), false);
         Integer soTimeoutSec = ConvertUtils.toInteger(defaultConfig.get(KafkaConfig.Fields.soTimeoutSec), false);
-        String saslMechanism = defaultConfig.get(KafkaConfig.Fields.saslMechanism);
-        if (StringUtils.isBlank(saslMechanism)) {
-            saslMechanism = "PLAIN";
-        }
-        config.setSaslMechanism(saslMechanism);
+        String defaultSchema = defaultConfig.get(KafkaConfig.Fields.defaultSchema);
+        config.setDefaultSchema(StringUtils.defaultIfBlank(defaultSchema, KafkaKeys.DEFAULT_SCHEMA));
         config.setConnectTimeoutMs(connectTimeoutMs == null ? 5000L : connectTimeoutMs);
-        config.setSoTimeoutSec(soTimeoutSec == null ? 10 : soTimeoutSec);
+        config.setSoTimeoutSec(soTimeoutSec == null ? 30 : soTimeoutSec);
+        if (config.getSecurityType() == null) {
+            config.setSecurityType(SecurityType.NONE);
+        }
         return dsConfig;
-    }
-
-    @Override
-    public void customizePanels(Map<DsConfigGroup, UiPanel> panels) {
-        UiPanel general = panels.get(DsConfigGroup.GENERAL);
-        if (general == null) {
-            return;
-        }
-        UiPanelField saslMechanism = general.findField(KafkaConfig.Fields.saslMechanism);
-        if (saslMechanism == null) {
-            return;
-        }
-        List<ValueDef> options = new ArrayList<>();
-        options.add(fieldOptionDef(KafkaConfigI18nKeys.CONFIG_KAFKA_SASL_PLAIN, "PLAIN"));
-        options.add(fieldOptionDef(KafkaConfigI18nKeys.CONFIG_KAFKA_SASL_SCRAM_256, "SCRAM-SHA-256"));
-        options.add(fieldOptionDef(KafkaConfigI18nKeys.CONFIG_KAFKA_SASL_SCRAM_512, "SCRAM-SHA-512"));
-        saslMechanism.setType(UiPanelFieldType.Options);
-        saslMechanism.setOptions(options);
-        if (saslMechanism.getDefaultValue() == null || saslMechanism.getDefaultValue().asValue() == null
-            || StringUtils.isBlank(String.valueOf(saslMechanism.getDefaultValue().asValue()))) {
-            saslMechanism.setDefaultValue(strValueDef("PLAIN"));
-        }
     }
 
     @Override
@@ -93,8 +74,45 @@ public class KafkaConfigSpi extends AbstractDsConfigSpi {
     }
 
     @Override
+    public void customizePanels(Map<DsConfigGroup, UiPanel> panels) {
+        UiPanel general = panels.get(DsConfigGroup.GENERAL);
+        if (general == null) {
+            return;
+        }
+
+        UiPanelField securityType = general.findField(DataSourceConfig.Fields.securityType);
+        if (securityType == null) {
+            return;
+        }
+
+        UiPanelField userName = UiPanelField.builder()
+            .field(DataSourceConfig.Fields.userName)
+            .type(UiPanelFieldType.Input)
+            .titleI18N(ConfigI18nKey.CONFIG_RDB_USERNAME_LABEL)
+            .require(false)
+            .build();
+        UiPanelField password = UiPanelField.builder()
+            .field(DataSourceConfig.Fields.password)
+            .type(UiPanelFieldType.Password)
+            .titleI18N(ConfigI18nKey.CONFIG_RDB_PASSWORD_LABEL)
+            .require(false)
+            .build();
+
+        List<ValueDef> options = new ArrayList<>();
+        options.add(fieldOptionDef(KafkaConfigI18nKeys.CONFIG_KAFKA_SECURITY_PROTOCOL_PLAINTEXT, SecurityType.NONE.name()));
+        options.add(fieldOptionDef(KafkaConfigI18nKeys.CONFIG_KAFKA_SECURITY_PROTOCOL_SASL_PLAINTEXT, SecurityType.USER_PASSWD.name())
+            .addField(userName)
+            .addField(password));
+        securityType.setOptions(options);
+        if (securityType.getDefaultValue() == null || securityType.getDefaultValue().asValue() == null
+            || StringUtils.isBlank(String.valueOf(securityType.getDefaultValue().asValue()))) {
+            securityType.setDefaultValue(strValueDef(SecurityType.NONE.name()));
+        }
+    }
+
+    @Override
     public List<SslMode> sslModeSet() {
-        return List.of(SslMode.TRUST, SslMode.CA, SslMode.TRUSTSTORE, SslMode.KEYSTORE_TRUSTSTORE, SslMode.CLIENT_CERT);
+        return Collections.emptyList();
     }
 
     @Override
@@ -104,7 +122,7 @@ public class KafkaConfigSpi extends AbstractDsConfigSpi {
 
     @Override
     public boolean supportSSL() {
-        return true;
+        return false;
     }
 
     @Override

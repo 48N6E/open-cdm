@@ -15,7 +15,6 @@
  */
 package com.clougence.clouddm.ds.kafka.dsconf;
 
-import java.io.IOException;
 import java.lang.reflect.Type;
 
 import com.clougence.clouddm.sdk.execute.dsconf.SerializationService;
@@ -24,9 +23,6 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 
-import lombok.extern.slf4j.Slf4j;
-
-@Slf4j
 public class KafkaSerializationSpi implements SerializationService {
 
     public static final String PROVIDER_NAME = "Kafka";
@@ -53,10 +49,8 @@ public class KafkaSerializationSpi implements SerializationService {
         try {
             JavaType paramJavaType = objectMapper.getTypeFactory().constructType(tryType);
             return objectMapper.readValue(jsonData, paramJavaType);
-        } catch (IOException e) {
-            String msg = "decode Kafka datasource config failed";
-            log.error(msg, e);
-            throw new IllegalStateException(msg, e);
+        } catch (Exception e) {
+            throw new IllegalStateException("decode Kafka config failed", e);
         }
     }
 }

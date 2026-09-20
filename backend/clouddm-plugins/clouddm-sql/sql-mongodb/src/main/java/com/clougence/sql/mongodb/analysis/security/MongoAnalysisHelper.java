@@ -34,6 +34,7 @@ public class MongoAnalysisHelper {
             case RS_STATUS:
             case RS_CONF:
             case RS_REPLICATION_INFO:
+            case RS_PRINT_SECONDARY_REPLICATION_INFO:
             case SH_STATUS:
             case SH_BALANCER_STATUS: {
                 return RuleQueryType.READ;

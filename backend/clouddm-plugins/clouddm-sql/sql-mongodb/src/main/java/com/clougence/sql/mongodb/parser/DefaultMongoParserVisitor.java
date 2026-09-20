@@ -305,8 +305,12 @@ public class DefaultMongoParserVisitor extends AbstractLocationParseTreeVisitor<
     @Override
     public Object visitReplicaSetFunction(MongoParser.ReplicaSetFunctionContext ctx) {
         String method = ctx.replicaSetMethod().getText();
-        if ("status".equalsIgnoreCase(method) || "printSecondaryReplicationInfo".equalsIgnoreCase(method) || "printSlaveReplicationInfo".equalsIgnoreCase(method)) {
+        if ("status".equalsIgnoreCase(method)) {
             this.instStack.push(new MongoReadCommandFunc(MongoFuncType.RS_STATUS, "{\"replSetGetStatus\":1}", "admin"));
+            return null;
+        }
+        if ("printSecondaryReplicationInfo".equalsIgnoreCase(method) || "printSlaveReplicationInfo".equalsIgnoreCase(method)) {
+            this.instStack.push(new MongoReadCommandFunc(MongoFuncType.RS_PRINT_SECONDARY_REPLICATION_INFO, "{\"replSetGetStatus\":1}", "admin"));
             return null;
         }
         if ("conf".equalsIgnoreCase(method) || "config".equalsIgnoreCase(method)) {

@@ -18,7 +18,7 @@ package com.clougence.clouddm.ds.kafka.execute;
 import java.util.Map;
 
 import com.clougence.clouddm.base.metadata.ds.DataSourceConfig;
-import com.clougence.clouddm.ds.kafka.execute.jdbc.KafkaKeys;
+import com.clougence.clouddm.ds.kafka.dsconf.KafkaConfig;
 import com.clougence.clouddm.dsfamily.execute.RdbSessionSpi;
 import com.clougence.clouddm.sdk.execute.session.SessionContextDTO;
 import com.clougence.clouddm.sdk.execute.session.rdb.RdbIsolation;
@@ -29,9 +29,11 @@ public class KafkaSessionSpi extends RdbSessionSpi {
     @Override
     public SessionContextDTO createSessionContext(DataSourceConfig dsConfig, Map<String, Object> params) {
         SessionContextDTO contextDTO = super.createSessionContext(dsConfig, params);
-        if (StringUtils.isBlank((String) params.get(PARAMS_DEFAULT_SCHEMA))) {
-            contextDTO.setRdbSchema(KafkaKeys.DEFAULT_SCHEMA);
+        KafkaConfig config = (KafkaConfig) dsConfig;
+        if (StringUtils.isBlank((String) params.get(PARAMS_DEFAULT_SCHEMA)) && StringUtils.isNotBlank(config.getDefaultSchema())) {
+            contextDTO.setRdbSchema(config.getDefaultSchema());
         }
+
         if (contextDTO.getRdbTxIsolation() == null || contextDTO.getRdbTxIsolation() == RdbIsolation.DEFAULT) {
             contextDTO.setRdbTxIsolation(RdbIsolation.DEFAULT);
         }

@@ -1032,6 +1032,19 @@ export default {
       this.selectedNode = node;
       this.$refs.tree.setSelected(node.key, true);
     },
+    isInstanceReadOnly(node) {
+      if (!node) {
+        return false;
+      }
+      const attr = node.INSTANCE?.attr || node.attr || {};
+      if (attr.readOnly === true || attr.readOnly === 'true') {
+        return true;
+      }
+      if (attr.consoleReadOnly === true || attr.consoleReadOnly === 'true') {
+        return true;
+      }
+      return false;
+    },
     onContextmenu(event) {
       if (!this.selectedNode) {
         return;
@@ -1041,19 +1054,39 @@ export default {
         this.selectedNode.nodeType
       );
       if (menuList) {
+        const instanceReadOnly = this.isInstanceReadOnly(this.selectedNode);
+        const writeMenus = new Set([
+          'MENU_BROWSE_TABLE_CREATE',
+          'MENU_BROWSE_TABLE_DROP',
+          'MENU_BROWSE_TABLE_ALTER',
+          'MENU_BROWSE_TABLE_RENAME',
+          'MENU_BROWSE_TABLE_TRUNCATE',
+          'MENU_BROWSE_SCHEMA_CREATE',
+          'MENU_BROWSE_SCHEMA_DROP',
+          'MENU_BROWSE_SCHEMA_RENAME',
+          'MENU_BROWSE_CATALOG_CREATE',
+          'MENU_BROWSE_CATALOG_DROP',
+          'MENU_BROWSE_CATALOG_RENAME',
+          'MENU_BROWSE_INSTANCE_DROP',
+          'MENU_BROWSE_INSTANCE_RENAME'
+        ]);
         const items = [];
         menuList.forEach((menu, menuIndex) => {
-          if (menu.menuId !== 'MENU_SEPARATOR') {
-            items.push({
-              label: resolveBrowserMenuLabel(menu),
-              svgProps: {
-                class: 'svg-icon'
-              },
-              svgIcon: `#icon-svg-${menu.menuId}`,
-              divided: menuList[menuIndex + 1] && menuList[menuIndex + 1].menuId === 'MENU_SEPARATOR',
-              onClick: () => this.handleRightClickMenu(menu.menuId)
-            });
+          if (menu.menuId === 'MENU_SEPARATOR') {
+            return;
           }
+          if (instanceReadOnly && writeMenus.has(menu.menuId)) {
+            return;
+          }
+          items.push({
+            label: resolveBrowserMenuLabel(menu),
+            svgProps: {
+              class: 'svg-icon'
+            },
+            svgIcon: `#icon-svg-${menu.menuId}`,
+            divided: menuList[menuIndex + 1] && menuList[menuIndex + 1].menuId === 'MENU_SEPARATOR',
+            onClick: () => this.handleRightClickMenu(menu.menuId)
+          });
         });
 
         if (items.length) {

@@ -23,6 +23,9 @@ import com.clougence.clouddm.sdk.execute.session.rdb.RdbIsolation;
 import com.clougence.clouddm.sdk.execute.session.rdb.RdbSupportLevel;
 import com.clougence.clouddm.sdk.execute.session.rdb.RdbSupportSpi;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class KafkaSupportSpi implements RdbSupportSpi {
 
     @Override

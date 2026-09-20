@@ -17,16 +17,14 @@ package com.clougence.clouddm.ds.kafka.execute.jdbc;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.admin.AdminClient;
 
 import com.clougence.drivers.adapter.AdapterFactory;
 import com.clougence.drivers.adapter.AdapterTypeSupport;
+import com.clougence.drivers.adapter.JdbcDriver;
 import com.clougence.drivers.adapter.TypeSupport;
 import com.clougence.utils.StringUtils;
 import com.clougence.utils.ref.LinkedCaseInsensitiveMap;
@@ -38,9 +36,8 @@ public class KafkaConnectionFactory implements AdapterFactory {
 
     @Override
     public String[] getPropertyNames() {
-        return new String[] { KafkaKeys.SERVER, KafkaKeys.ADAPTER_NAME, KafkaKeys.CONN_TIMEOUT, KafkaKeys.SO_TIMEOUT, KafkaKeys.USERNAME, KafkaKeys.PASSWORD,
-                              KafkaKeys.CLIENT_NAME, KafkaKeys.SASL_MECHANISM, KafkaKeys.SSL_MODE, KafkaKeys.SSL_CA_FILE, KafkaKeys.SSL_CA_PASSWORD,
-                              KafkaKeys.SSL_CLIENT_CERT_FILE, KafkaKeys.SSL_CLIENT_KEY_FILE, KafkaKeys.SSL_CLIENT_KEY_PASSWORD };
+        return new String[] { KafkaKeys.SERVER, KafkaKeys.ADAPTER_NAME, KafkaKeys.DRIVER_VERSION, KafkaKeys.CONN_TIMEOUT, KafkaKeys.SO_TIMEOUT, KafkaKeys.USERNAME,
+                              KafkaKeys.PASSWORD, KafkaKeys.SECURITY_PROTOCOL, KafkaKeys.DATABASE, KafkaKeys.CLIENT_NAME, KafkaKeys.BOOTSTRAP_SERVERS };
     }
 
     @Override
@@ -52,37 +49,40 @@ public class KafkaConnectionFactory implements AdapterFactory {
     public KafkaConnection createConnection(Connection owner, String jdbcUrl, Properties props) throws SQLException {
         Map<String, String> caseProps = new LinkedCaseInsensitiveMap<>();
         props.forEach((k, v) -> caseProps.put((String) k, v == null ? "" : String.valueOf(v)));
-        String bootstrap = normalizeBootstrap(caseProps.get(KafkaKeys.SERVER));
-        Properties adminProps = KafkaClientProps.adminProps(caseProps, bootstrap);
-        AdminClient admin = AdminClient.create(adminProps);
+
+        if (StringUtils.isBlank(caseProps.get(KafkaKeys.BOOTSTRAP_SERVERS))) {
+            String bootstrap = resolveBootstrap(jdbcUrl, caseProps.get(KafkaKeys.SERVER));
+            caseProps.put(KafkaKeys.BOOTSTRAP_SERVERS, bootstrap);
+            caseProps.put(KafkaKeys.SERVER, bootstrap);
+        }
+
         try {
-            int timeoutMs = StringUtils.isBlank(caseProps.get(KafkaKeys.SO_TIMEOUT)) ? 10000 : Integer.parseInt(caseProps.get(KafkaKeys.SO_TIMEOUT));
-            admin.describeCluster().clusterId().get(timeoutMs, TimeUnit.MILLISECONDS);
-            return new KafkaConnection(owner, admin, caseProps, bootstrap, jdbcUrl);
+            Properties adminProps = KafkaAdminConfigs.fromCaseMap(caseProps);
+            AdminClient adminClient = AdminClient.create(adminProps);
+            return new KafkaConnection(owner, adminClient, jdbcUrl, props, caseProps.get(KafkaKeys.DATABASE));
         } catch (Exception e) {
-            admin.close();
-            throw new SQLException("create Kafka connection failed: " + e.getMessage(), e);
+            throw new SQLException("create Kafka AdminClient failed: " + e.getMessage(), e);
         }
     }
 
-    static String normalizeBootstrap(String host) {
-        if (StringUtils.isBlank(host)) {
-            throw new IllegalArgumentException("Kafka bootstrap servers is required.");
+    private static String resolveBootstrap(String jdbcUrl, String server) {
+        if (StringUtils.isNotBlank(server)) {
+            return server;
         }
-        List<String> servers = new ArrayList<>();
-        for (String part : host.split(",")) {
-            String item = part.trim();
-            if (item.isEmpty()) {
-                continue;
-            }
-            if (!item.contains(":")) {
-                item = item + ":9092";
-            }
-            servers.add(item);
+        int i = jdbcUrl.indexOf(JdbcDriver.START_URL);
+        if (i < 0) {
+            return jdbcUrl;
         }
-        if (servers.isEmpty()) {
-            throw new IllegalArgumentException("Kafka bootstrap servers is required.");
+        String rest = jdbcUrl.substring(i + JdbcDriver.START_URL.length());
+        if (rest.startsWith(KafkaKeys.ADAPTER_NAME_VALUE)) {
+            rest = rest.substring(KafkaKeys.ADAPTER_NAME_VALUE.length());
         }
-        return StringUtils.join(servers, ",");
+        if (rest.startsWith(":")) {
+            rest = rest.substring(1);
+        }
+        if (rest.startsWith("//")) {
+            rest = rest.substring(2);
+        }
+        return rest;
     }
 }

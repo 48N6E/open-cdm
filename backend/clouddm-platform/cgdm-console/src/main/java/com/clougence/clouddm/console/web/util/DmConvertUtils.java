@@ -2228,8 +2228,13 @@ public class DmConvertUtils {
     }
 
     public static URI createFileUri(String fileUriStr) {
+        if (StringUtils.isBlank(fileUriStr)) {
+            throw new ErrorMessageException(DmI18nUtils.getMessage(I18nRdpMsgKeys.COMM_BAD_ARG_ERROR.name()));
+        }
+        // Windows may historically persist wsn URIs with backslashes; normalize before parse.
+        String normalized = fileUriStr.replace('\\', '/');
         try {
-            return new URI(fileUriStr);
+            return new URI(normalized);
         } catch (Exception e) {
             throw new ErrorMessageException(DmI18nUtils.getMessage(I18nRdpMsgKeys.COMM_BAD_ARG_ERROR.name()));
         }
