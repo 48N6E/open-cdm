@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.clougence.clouddm.ds.clickhouse.sql.analysis.behavior;
+package com.clougence.clouddm.ds.oceanbase.sql.ob4my.analysis.behavior;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,14 +26,14 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import com.clougence.clouddm.sdk.sql.analysis.behavior.StatementBehavior;
 import com.clougence.schema.umi.struts.UmiTypes;
 
-final class ChBehaviorParserVisitor extends AbstractParseTreeVisitor<Void> {
+final class ObMyBehaviorParserVisitor extends AbstractParseTreeVisitor<Void> {
     private final Parser                  parser;
     private final Map<UmiTypes, Object>   levels;
     private final int                     baseLine;
     private final int                     baseColumn;
     private final List<StatementBehavior> behaviors = new ArrayList<>();
 
-    ChBehaviorParserVisitor(Parser parser, Map<UmiTypes, Object> levels, int baseLine, int baseColumn){
+    ObMyBehaviorParserVisitor(Parser parser, Map<UmiTypes, Object> levels, int baseLine, int baseColumn){
         this.parser = parser;
         this.levels = levels;
         this.baseLine = baseLine;
@@ -46,9 +46,8 @@ final class ChBehaviorParserVisitor extends AbstractParseTreeVisitor<Void> {
 
     @Override
     public Void visit(ParseTree tree) {
-        ChExplainBehaviorVisitor visitor = new ChExplainBehaviorVisitor(parser, levels, baseLine, baseColumn);
+        ObMyStatementBehaviorVisitor visitor = new ObMyStatementBehaviorVisitor(parser, levels, baseLine, baseColumn);
         visitor.visit(tree);
-        visitor.finish();
         behaviors.add(visitor.behavior());
         return null;
     }
