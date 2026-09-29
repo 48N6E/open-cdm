@@ -13,25 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.clougence.clouddm.platform.dal.access;
+package com.clougence.clouddm.console.web.model.fo.editor.query;
 
-import com.clougence.clouddm.platform.dal.mapper.execution.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.Setter;
 
-public interface ExecutionDal {
+@Getter
+@Setter
+public class SqlScriptCreateFO {
 
-    DmExecAsyncTaskMapper asyncTaskMapper();
-
-    DmExecAutoJobMapper autoJobMapper();
-
-    DmExecAutoTaskMapper autoTaskMapper();
-
-    DmExecFileMapper fileMapper();
-
-    DmExecSessionMapper sessionMapper();
-
-    DmExecSqlAuditMapper sqlAuditMapper();
-
-    DmExecSqlScriptMapper sqlScriptMapper();
-
-    // ---------- dal service methods ----------
+    @NotBlank
+    @Size(max = 128)
+    private String name;
+    @NotBlank
+    @Size(max = 64)
+    private String dsType;
+    @NotNull
+    private String sqlContent;
 }

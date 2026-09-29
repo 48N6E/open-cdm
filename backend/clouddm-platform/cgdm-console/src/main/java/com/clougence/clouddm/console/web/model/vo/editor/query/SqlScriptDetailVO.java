@@ -13,25 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.clougence.clouddm.platform.dal.access;
+package com.clougence.clouddm.console.web.model.vo.editor.query;
 
-import com.clougence.clouddm.platform.dal.mapper.execution.*;
+import lombok.Getter;
+import lombok.Setter;
 
-public interface ExecutionDal {
+@Getter
+@Setter
+public class SqlScriptDetailVO extends SqlScriptSummaryVO {
 
-    DmExecAsyncTaskMapper asyncTaskMapper();
-
-    DmExecAutoJobMapper autoJobMapper();
-
-    DmExecAutoTaskMapper autoTaskMapper();
-
-    DmExecFileMapper fileMapper();
-
-    DmExecSessionMapper sessionMapper();
-
-    DmExecSqlAuditMapper sqlAuditMapper();
-
-    DmExecSqlScriptMapper sqlScriptMapper();
-
-    // ---------- dal service methods ----------
+    private String sqlContent;
 }

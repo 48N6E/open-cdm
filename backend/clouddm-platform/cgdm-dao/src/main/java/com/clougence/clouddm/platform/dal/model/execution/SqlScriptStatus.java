@@ -13,25 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.clougence.clouddm.platform.dal.access;
+package com.clougence.clouddm.platform.dal.model.execution;
 
-import com.clougence.clouddm.platform.dal.mapper.execution.*;
-
-public interface ExecutionDal {
-
-    DmExecAsyncTaskMapper asyncTaskMapper();
-
-    DmExecAutoJobMapper autoJobMapper();
-
-    DmExecAutoTaskMapper autoTaskMapper();
-
-    DmExecFileMapper fileMapper();
-
-    DmExecSessionMapper sessionMapper();
-
-    DmExecSqlAuditMapper sqlAuditMapper();
-
-    DmExecSqlScriptMapper sqlScriptMapper();
-
-    // ---------- dal service methods ----------
+public enum SqlScriptStatus {
+    Ready,
+    Deleting
 }

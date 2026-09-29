@@ -13,25 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.clougence.clouddm.platform.dal.access;
+package com.clougence.clouddm.console.web.service.editor.script;
 
-import com.clougence.clouddm.platform.dal.mapper.execution.*;
+import java.util.Set;
 
-public interface ExecutionDal {
+public interface SqlScriptStorage {
 
-    DmExecAsyncTaskMapper asyncTaskMapper();
+    String put(String content);
 
-    DmExecAutoJobMapper autoJobMapper();
+    String read(String fileUri);
 
-    DmExecAutoTaskMapper autoTaskMapper();
+    void touch(String fileUri);
 
-    DmExecFileMapper fileMapper();
+    void delete(String fileUri);
 
-    DmExecSessionMapper sessionMapper();
-
-    DmExecSqlAuditMapper sqlAuditMapper();
-
-    DmExecSqlScriptMapper sqlScriptMapper();
-
-    // ---------- dal service methods ----------
+    void cleanupOrphans(Set<String> referencedFileUris);
 }
