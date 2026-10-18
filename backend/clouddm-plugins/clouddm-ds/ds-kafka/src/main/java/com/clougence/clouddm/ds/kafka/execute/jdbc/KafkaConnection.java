@@ -67,10 +67,14 @@ public class KafkaConnection extends AdapterConnection {
 
     @Override
     protected <T> T unwrap(Class<T> iface) throws SQLException {
-        if (iface == KafkaConnection.class) {
+        if (iface == null) {
+            return super.unwrap(iface);
+        }
+        if (iface == KafkaConnection.class || KafkaConnection.class.getName().equals(iface.getName())) {
             return (T) this;
         }
-        if (iface == AdminClient.class) {
+        // Plugin CL and driver CL each load AdminClient; compare by name across loaders.
+        if (iface == AdminClient.class || AdminClient.class.getName().equals(iface.getName())) {
             return (T) this.adminClient;
         }
         if (AdapterConnection.class.isAssignableFrom(iface) && iface.isInstance(this)) {
