@@ -28,8 +28,10 @@ import com.clougence.clouddm.ds.etcd.command.EtcdCommandParser;
 import com.clougence.clouddm.ds.etcd.dsconf.EtcdConfig;
 import com.clougence.clouddm.ds.etcd.i18n.EtcdDsI18nKeys;
 import com.clougence.clouddm.sdk.execute.meta.DsMetaService;
+import com.clougence.clouddm.sdk.execute.session.MessageLevel;
 import com.clougence.clouddm.sdk.execute.session.QueryRequest;
 import com.clougence.clouddm.sdk.execute.session.ResultBuilder;
+import com.clougence.clouddm.sdk.execute.session.ResultBuilder.ResultMessageBuild;
 import com.clougence.clouddm.sdk.execute.session.Session;
 import com.clougence.clouddm.sdk.execute.session.SessionCallback;
 import com.clougence.clouddm.sdk.execute.session.SessionCloseListener;
@@ -37,6 +39,7 @@ import com.clougence.clouddm.sdk.execute.session.SessionContextDTO;
 import com.clougence.clouddm.sdk.execute.session.rdb.RdbIsolation;
 import com.clougence.clouddm.sdk.model.exception.ThirdPartyApiException;
 import com.clougence.drivers.DsObject;
+import com.clougence.utils.i18n.I18nUtils;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +47,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class EtcdSession implements Session {
 
+    private final I18nUtils                  i18n           = I18nUtils.initI18n(EtcdDsI18nKeys.class);
     @Getter
     private final String                     sessionId;
     @Getter
@@ -112,6 +116,29 @@ public class EtcdSession implements Session {
 
     @Override
     public void executeQuery(QueryRequest query, ResultBuilder builder) {
+        long start = System.currentTimeMillis();
+        try {
+            executeCommand(query, builder);
+        } catch (Exception e) {
+            ThirdPartyApiException failure;
+            if (e instanceof ThirdPartyApiException apiException) {
+                failure = apiException;
+            } else {
+                failure = ThirdPartyApiException.as().with(e);
+            }
+            String msg = "Execute etcd command failed, queryId=" + query.getQueryId();
+            log.error(msg, e);
+            String detail = i18n.getMessage(failure.getMessageKey(), failure.getMessageArgs());
+            ResultMessageBuild message = builder.newMessage(query);
+            // SessionAgent uses notify=true errors to finish the prepared audit as FAILURE.
+            message.receiveMessage(MessageLevel.Error, detail, true);
+            message.collectCost(System.currentTimeMillis() - start);
+            message.finishRecord(false, detail, failure);
+            throw failure;
+        }
+    }
+
+    private void executeCommand(QueryRequest query, ResultBuilder builder) {
         EtcdCommand command = EtcdCommandParser.parse(query.getQueryBody());
         if (this.readOnly && command.getKind() != EtcdCommandKind.GET) {
             throw ThirdPartyApiException.as().with(EtcdDsI18nKeys.ETCD_SESSION_READ_ONLY);

@@ -16,7 +16,11 @@
 package com.clougence.clouddm.ds.etcd.execute;
 
 import com.clougence.clouddm.base.metadata.ds.SecurityType;
+import com.clougence.clouddm.base.metadata.ds.SslMode;
 import com.clougence.clouddm.ds.etcd.dsconf.EtcdConfig;
+import com.clougence.clouddm.ds.etcd.i18n.EtcdDsI18nKeys;
+import com.clougence.clouddm.sdk.execute.dsconf.SslConfig;
+import com.clougence.clouddm.sdk.execute.dsconf.SslFile;
 import com.clougence.clouddm.sdk.execute.resource.DsResourceManager;
 import com.clougence.clouddm.sdk.execute.session.Session;
 import com.clougence.clouddm.sdk.execute.session.SessionContextDTO;
@@ -37,6 +41,9 @@ public class EtcdSessionFactory implements SessionFactory<EtcdConfig> {
                 config.setUserName(null);
                 config.setPassword(null);
             }
+            if (config.getSslMode() == SslMode.CA) {
+                resolveCa(resources, config);
+            }
             resource = resources.requestResource(config);
             return new EtcdSession(context, config, resource);
         } catch (Exception e) {
@@ -50,5 +57,18 @@ public class EtcdSessionFactory implements SessionFactory<EtcdConfig> {
             }
             throw ThirdPartyApiException.as().with(e);
         }
+    }
+
+    private void resolveCa(DsResourceManager resources, EtcdConfig config) throws Exception {
+        SslConfig ssl = resources.fetchSslConfig(config);
+        config.setSslCaFilePath(null);
+        if (ssl == null) {
+            throw ThirdPartyApiException.as().with(EtcdDsI18nKeys.ETCD_SSL_CA_REQUIRED);
+        }
+        SslFile ca = ssl.getCaFile();
+        if (ca == null || ca.getFile() == null) {
+            throw ThirdPartyApiException.as().with(EtcdDsI18nKeys.ETCD_SSL_CA_REQUIRED);
+        }
+        config.setSslCaFilePath(ca.getFile().getAbsolutePath());
     }
 }

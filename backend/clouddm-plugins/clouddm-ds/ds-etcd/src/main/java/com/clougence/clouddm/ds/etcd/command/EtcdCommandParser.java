@@ -82,13 +82,49 @@ public final class EtcdCommandParser {
             throw ThirdPartyApiException.as().with(EtcdDsI18nKeys.ETCD_COMMAND_KEY_REQUIRED);
         }
         if (kind == EtcdCommandKind.PUT) {
-            int valueStart = rest.indexOf(' ');
-            if (valueStart < 0) {
-                return new EtcdCommand(kind, unquote(rest), "");
+            int[] cursor = new int[] { 0 };
+            String key = readArgument(rest, cursor);
+            if (key == null || key.isEmpty()) {
+                throw ThirdPartyApiException.as().with(EtcdDsI18nKeys.ETCD_COMMAND_KEY_REQUIRED);
             }
-            return new EtcdCommand(kind, unquote(rest.substring(0, valueStart)), unquote(rest.substring(valueStart + 1).trim()));
+            String value = "";
+            int valueStart = cursor[0];
+            while (valueStart < rest.length() && rest.charAt(valueStart) == ' ') {
+                valueStart++;
+            }
+            if (valueStart < rest.length()) {
+                value = unquote(rest.substring(valueStart).trim());
+            }
+            return new EtcdCommand(kind, key, value);
         }
         return new EtcdCommand(kind, unquote(rest), null);
+    }
+
+    private static String readArgument(String text, int[] cursor) {
+        int start = cursor[0];
+        while (start < text.length() && text.charAt(start) == ' ') {
+            start++;
+        }
+        if (start >= text.length()) {
+            cursor[0] = start;
+            return null;
+        }
+        char quote = text.charAt(start);
+        if (quote == '"' || quote == '\'') {
+            int end = text.indexOf(quote, start + 1);
+            if (end < 0) {
+                throw ThirdPartyApiException.as().with(EtcdDsI18nKeys.ETCD_COMMAND_UNSUPPORTED);
+            }
+            cursor[0] = end + 1;
+            return text.substring(start + 1, end);
+        }
+        int end = text.indexOf(' ', start);
+        if (end < 0) {
+            cursor[0] = text.length();
+            return text.substring(start);
+        }
+        cursor[0] = end;
+        return text.substring(start, end);
     }
 
     private static SplitQueryType queryType(String body) {

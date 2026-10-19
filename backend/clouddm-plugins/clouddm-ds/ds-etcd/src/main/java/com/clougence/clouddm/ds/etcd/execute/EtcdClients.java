@@ -15,6 +15,7 @@
  */
 package com.clougence.clouddm.ds.etcd.execute;
 
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -24,6 +25,8 @@ import java.util.concurrent.TimeUnit;
 
 import com.clougence.clouddm.ds.etcd.i18n.EtcdDsI18nKeys;
 import com.clougence.clouddm.sdk.model.exception.ThirdPartyApiException;
+
+import javax.net.ssl.SSLException;
 
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.Client;
@@ -39,7 +42,7 @@ public class EtcdClients implements AutoCloseable {
     private final long         timeoutMs;
     private volatile boolean   closed;
 
-    public EtcdClients(String endpoints, String user, String password, boolean tls, long timeoutMs){
+    public EtcdClients(String endpoints, String user, String password, boolean tls, File caFile, long timeoutMs){
         this.timeoutMs = timeoutMs;
         String scheme = "http://";
         if (tls) {
@@ -56,6 +59,13 @@ public class EtcdClients implements AutoCloseable {
             builder.user(ByteSequence.from(user, StandardCharsets.UTF_8));
             String secret = password == null ? "" : password;
             builder.password(ByteSequence.from(secret, StandardCharsets.UTF_8));
+        }
+        if (caFile != null) {
+            try {
+                builder.sslContext(ssl -> ssl.trustManager(caFile));
+            } catch (SSLException e) {
+                throw ThirdPartyApiException.as().with(e);
+            }
         }
         Thread thread = Thread.currentThread();
         ClassLoader contextClassLoader = thread.getContextClassLoader();

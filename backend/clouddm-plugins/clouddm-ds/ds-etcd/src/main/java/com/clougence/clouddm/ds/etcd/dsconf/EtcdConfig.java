@@ -28,6 +28,7 @@ import com.clougence.clouddm.ds.etcd.i18n.EtcdDsI18nKeys;
 import com.clougence.clouddm.sdk.execute.dsconf.Serialization;
 import com.clougence.clouddm.sdk.model.exception.ThirdPartyApiException;
 import com.clougence.drivers.DsConfigKeys;
+import com.clougence.utils.StringUtils;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Getter;
@@ -68,6 +69,9 @@ public class EtcdConfig extends DataSourceConfig {
         properties.setProperty(ENDPOINTS, safeStr(getHost()));
         properties.setProperty("api.timeout.ms", String.valueOf(apiTimeoutMs));
         properties.setProperty(DsConfigKeys.SSL_MODE.getConfigKey(), sslMode.name());
+        if (sslMode == SslMode.CA && StringUtils.isNotBlank(getSslCaFilePath())) {
+            properties.setProperty(DsConfigKeys.SSL_CA_FILE.getConfigKey(), getSslCaFilePath());
+        }
         if (securityType == SecurityType.USER_PASSWD) {
             properties.setProperty(DsConfigKeys.USER.getConfigKey(), safeStr(getUserName()));
             properties.setProperty(DsConfigKeys.PASSWORD.getConfigKey(), safeStr(getPassword()));

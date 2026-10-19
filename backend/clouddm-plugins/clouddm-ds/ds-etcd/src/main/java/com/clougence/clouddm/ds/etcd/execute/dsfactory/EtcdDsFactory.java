@@ -15,11 +15,13 @@
  */
 package com.clougence.clouddm.ds.etcd.execute.dsfactory;
 
+import java.io.File;
 import java.util.Properties;
 
 import com.clougence.clouddm.base.metadata.ds.SslMode;
 import com.clougence.clouddm.ds.etcd.dsconf.EtcdConfig;
 import com.clougence.clouddm.ds.etcd.execute.EtcdClients;
+import com.clougence.clouddm.ds.etcd.i18n.EtcdDsI18nKeys;
 import com.clougence.clouddm.sdk.model.exception.ThirdPartyApiException;
 import com.clougence.drivers.DsConfigKeys;
 import com.clougence.drivers.DsFactory;
@@ -40,7 +42,15 @@ public class EtcdDsFactory implements DsFactory<EtcdClients> {
         long timeoutMs = Long.parseLong(dsConfig.getProperty("api.timeout.ms", "10000"));
         try {
             boolean tls = sslMode != SslMode.DISABLED;
-            EtcdClients clients = new EtcdClients(endpoints, user, password, tls, timeoutMs);
+            File caFile = null;
+            if (sslMode == SslMode.CA) {
+                String caPath = dsConfig.getProperty(DsConfigKeys.SSL_CA_FILE.getConfigKey());
+                if (StringUtils.isBlank(caPath) || !new File(caPath).isFile()) {
+                    throw ThirdPartyApiException.as().with(EtcdDsI18nKeys.ETCD_SSL_CA_REQUIRED);
+                }
+                caFile = new File(caPath);
+            }
+            EtcdClients clients = new EtcdClients(endpoints, user, password, tls, caFile, timeoutMs);
             return new DsObject<>(dsConfig, clients, this);
         } catch (RuntimeException e) {
             String msg = "Create etcd client failed, instanceID=" + dsConfig.getProperty(DsConfigKeys.ID.getConfigKey());
