@@ -138,9 +138,7 @@ public class DmDsConfigServiceImpl implements DmDsConfigService, UnifiedPostCons
 
             DsConfig config = new DsConfig();
             config.setFeatures(PluginManager.hasFeature(dsType));
-            if (dsType == DataSourceType.Etcd) {
-                config.setClassify("CACHE");
-            }
+            config.setClassify(dsType.getClassify());
             config.setConstant(new DsConstantConfig());
             config.setCategories(new DsCategories());
             config.setMenus(new HashMap<>());
