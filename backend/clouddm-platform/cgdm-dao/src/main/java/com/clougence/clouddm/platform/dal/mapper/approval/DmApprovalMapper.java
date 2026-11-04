@@ -48,9 +48,11 @@ public interface DmApprovalMapper extends BaseMapper<DmApprovalDO> {
 
     DmApprovalDO queryByApproIdentity(@Param("approIdentity") String approIdentity, @Param("type") String type, @Param("puid") String puid);
 
-    int updateModified(Long id);
+    long queryScheduleUpperId();
 
-    List<Long> listUnFinishTicketIdList();
+    List<Long> listScheduleTicketIds(@Param("afterId") long afterId, @Param("upperId") long upperId, @Param("idle") boolean idle, @Param("limit") int limit);
+
+    DmApprovalDO queryScheduleInfo(@Param("id") long id);
 
     DmApprovalDO selectByIdForUpdate(@Param("ticketId") Long ticketId);
 
@@ -62,4 +64,10 @@ public interface DmApprovalMapper extends BaseMapper<DmApprovalDO> {
 
     void updateExpectedAffectedRows(@Param("ticketId") Long ticketId, @Param("expectedAffectedRows") Long expectedAffectedRows);
 
+    long countActiveByTemplate(@Param("primaryUid") String primaryUid, @Param("identity") String identity, @Param("approvalType") String approvalType,
+                               @Param("terminalStatuses") List<String> terminalStatuses);
+
+    List<DmApprovalDO> listCustomTickets(@Param("primaryUid") String primaryUid, @Param("pendingOnly") boolean pendingOnly);
+
+    List<DmApprovalDO> listPendingByBizIds(@Param("primaryUid") String primaryUid, @Param("bizIds") List<String> bizIds);
 }

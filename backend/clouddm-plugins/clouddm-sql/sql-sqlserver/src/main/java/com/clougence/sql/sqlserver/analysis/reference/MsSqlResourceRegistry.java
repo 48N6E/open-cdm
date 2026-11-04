@@ -3,9 +3,19 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.clougence.sql.sqlserver.analysis.reference;
 
+import static com.clougence.sql.common.registry.RegisteredResourceType.FUNCTION;
 import static com.clougence.sql.common.registry.RegisteredResourceType.PROCEDURE;
 
 import java.util.List;
@@ -26,6 +36,13 @@ public final class MsSqlResourceRegistry {
     private MsSqlResourceRegistry(){
         resources.register(PROCEDURE, VERSION, VERSION, true, "sys", "sp_cdc_enable_db");
         resources.register(PROCEDURE, VERSION, VERSION, true, "sys", "sp_cdc_disable_db");
+        resources.register(PROCEDURE, 2008, 2022, true, "sys", "sp_getapplock");
+        resources.register(PROCEDURE, 2008, 2022, true, "sys", "sp_releaseapplock");
+        resources.register(PROCEDURE, 2016, 2022, true, "sys", "sp_set_session_context");
+        for (String function : List.of("CONTEXT_INFO", "XACT_STATE", "ORIGINAL_LOGIN", "SUSER_SNAME", "USER_NAME", "DB_NAME", "DB_ID", "OBJECT_ID", "SESSIONPROPERTY")) {
+            resources.register(FUNCTION, 2008, 2022, true, function);
+        }
+        resources.register(FUNCTION, 2016, 2022, true, "SESSION_CONTEXT");
     }
 
     public static MsSqlResourceRegistry instance() {
@@ -39,6 +56,14 @@ public final class MsSqlResourceRegistry {
         return resources.contains(PROCEDURE, VERSION, nameParts.toArray(String[]::new));
     }
 
+    public boolean isSessionProcedure(String schema, String name, int version) {
+        return resources.contains(PROCEDURE, version, schema, name);
+    }
+
+    public boolean isBuiltinFunction(String name, int version) {
+        return resources.contains(FUNCTION, version, name);
+    }
+
     private enum MsSqlResourceDialect implements ResourceRegistryDialect {
         INSTANCE;
 
@@ -46,7 +71,13 @@ public final class MsSqlResourceRegistry {
         public String normalizeIdentifier(String identifier) {
             String normalized = identifier == null ? "" : identifier.trim();
             if (isQuotedIdentifier(normalized)) {
+                char quote = normalized.charAt(0);
                 normalized = normalized.substring(1, normalized.length() - 1);
+                if (quote == '[') {
+                    normalized = normalized.replace("]]", "]");
+                } else {
+                    normalized = normalized.replace("\"\"", "\"");
+                }
             }
             return normalized.toLowerCase(Locale.ROOT);
         }

@@ -122,6 +122,8 @@ cd frontend && npm run check-i18n
 - 不要为实际不可能出现的 `null`、空值或非法状态写复杂防御分支；防御逻辑只放在真实边界和不可信输入处。
 - 避免长条件和层层 `if` 堆叠导致代码难读；如果必须校验，优先让边界、契约和数据结构保持清晰。
 - 代码要干净直接，好读优先，不要为了抽象而抽象。
+- 组装多个对象时，按对象集中排列字段赋值（包括 setter、直接赋值和 Map 的 `put`），同一对象的业务字段、审计字段和时间字段放在一起，避免无依赖的交叉赋值；对象之间用空行分隔。
+- 嵌套对象优先先组装子对象，再集中组装父对象。涉及权限判断、状态更新、数据库回填 ID 等依赖时，保留必要的执行顺序，不为集中排列新增无意义的分支、方法或封装。
 - 尽量不写三元表达式，能用 `if` 表达清楚的逻辑，优先使用 `if`。
     - 连续条件判断的三元表达式只有在完整表达式能控制在 100 个字符以内时才允许使用；超过后必须退化为显式 `if`
       ，避免嵌套三元和换行三元影响阅读。
@@ -139,12 +141,26 @@ cd frontend && npm run check-i18n
 - 使用 Jakarta Bean Validation 注解时，不要设置 `message` 属性，直接使用注解的默认校验消息。
 - 不要使用 `@SneakyThrows`；需要 `try/catch` 异常时，用简短 `msg` 描述错误，并通过 `log.error(msg, e)` 打印异常。
 - Java 中能用 Lombok 解决 getter / setter 模板代码的地方，优先使用 Lombok。
+- Lombok 注解按实际用途添加，不默认叠加 `@EqualsAndHashCode`、`@ToString` 等；值比较、集合键或日志输出等真实使用场景需要时才保留。
+- 同时需要 getter 和 setter，且需要三个及以上 Lombok 注解时，使用 `@Data` 合并其覆盖的注解；`@Data` 不覆盖的构造器、日志等注解按需保留。不要为了使用 `@Data` 给只读对象增加 setter。
 - 重复胶水代码要适度收敛，但收敛方式不能比原逻辑更难懂。
 - 注释只解释不明显的业务约束、协议边界或复杂流程，不写重复代码字面含义的注释。
 - 前端调用后端时，使用的接口名称要求格式为驼峰命名法。
 
 ## Java 后端规则
 
+- 修改任何 Java 文件后，必须在仓库根目录运行 `./scripts/format_java.sh`，统一完成 imports 优化和
+  `codeformat.xml`（`cdm-format`）格式化，且命令必须成功（退出码为 0）。
+- 运行前确保 IDEA 已打开对应项目、索引完成且文件已保存；同时运行多个 IDEA 版本时，通过 `IDEA_BIN` 指定。
+- imports 优化沿用 IDEA 实际选用的优化器，包括 Eclipse Formatter 等插件的覆盖实现，不绕过插件调用默认优化器。
+- imports 以项目实际生效的 IDEA Java Code Style 配置为准，包括适用的 `.editorconfig` 和项目 Code Style；
+  未覆盖的设置使用 IDEA 当前选用的方案。分组、排序、空行及静态导入位置遵循 Import Layout，不另行硬编码分组顺序。
+- Optimize Imports 应清理未使用、重复和冗余导入，并遵循普通／静态导入的通配符阈值、强制通配符包列表及内部类导入设置。
+  IDEA 默认阈值通常为同包 5 个类、同类 3 个静态成员，实际值以生效配置为准；合并时必须处理名称冲突，
+  不得强制展开所有 `*`，也不得仅按数量机械合并。
+- 不得用手工整理、其他格式化工具或 `--format-only`、`--check`、`--dry-run` 代替完整执行；
+  脚本失败时应修复后重试，无法解决时明确报告阻塞原因，不得认定任务完成。
+- 脚本自动处理 Git 中已暂存、未暂存和未跟踪的 Java 文件；执行前后检查 diff，保留用户已有改动，并运行相关编译验证。
 - 遵循现有包结构和模块边界，避免跨层直接调用导致平台、插件、启动模块相互缠绕。
 - 优先使用项目已有基础设施，例如 `com.clougence.utils`、插件 SDK、DAO、服务层、统一异常和日志机制。
 - 数据库实体沿用 `DO` 后缀，表单对象沿用 `FO`，请求 / 响应对象沿用 `VO`。
@@ -183,6 +199,41 @@ cd frontend && npm run check-i18n
   不做机械展开。
 - 修改表结构、字段语义或默认数据时，同步检查 DAO、DO、mapper、初始化脚本、升级脚本、前端展示和测试。
 
+### Flyway 数据订正
+
+- `collectScript()` 只放 DDL 结构变更；历史数据回填、状态转换、缓存去重等 `INSERT`、`UPDATE`、`DELETE`
+  数据订正放到 `beforeMigrate(Connection)` 或 `afterMigrate(Connection)`，不要混入 `collectScript()`。
+- 执行顺序为 `beforeMigrate()` → `collectScript()` → `afterMigrate()`。依赖旧字段或必须在结构变更前完成的订正放到
+  `beforeMigrate()`；依赖新增字段、表或新结构的订正放到 `afterMigrate()`。
+- 唯一索引、非空约束等依赖数据订正结果时，必须先订正数据，再在对应钩子中执行依赖的 DDL，并注释说明顺序依赖；
+  不要在 `collectScript()` 中提前建立这些约束。
+- 简单订正沿用 `safeExecute(connection, sql)`；需要参数绑定或逐条处理时，使用 `PreparedStatement`，通过
+  try-with-resources 释放语句和结果集，复杂业务转换放在 Java 中完成。
+- 订正必须限定正确的账号归属、业务类型、来源及待订正状态，并保证重复执行幂等。缓存去重须明确保留规则，
+  不得误删自定义业务定义、在途实例或历史记录。
+- 参考现有 `V202607270001__sql_audit_ack` 的参数化订正和 `V202607290003__consolidated_upgrade` 的
+  “先回填、再加约束”写法。验证时使用隔离测试库，覆盖存量数据、重复执行、订正范围及约束生效，不直接重跑共享开发库迁移。
+
+### MyBatis Mapper XML 可读性规则
+
+- 新增或修改 MyBatis Mapper XML 时，以
+  `backend/clouddm-platform/cgdm-dao/src/main/resources/mybatis/mapper/DmApprovalProcessMapper.xml` 为排版参考。
+- XML 使用 4 个空格缩进，每深入一层增加 4 个空格，禁止使用 Tab；自闭合标签写成 `<result .../>`，`/>` 前不加空格。
+- `DOCTYPE` 的公共标识和 URL 分成两行，第二行缩进 8 个空格。`<resultMap>`、`<sql>` 和每条 CRUD 语句等顶层代码块之间
+  只保留一个空行；同类 CRUD 语句也不能连续挤在一起或使用多个空行。
+- `resultMap` 每个字段映射独占一行。单行过长时，从 `javaType`、`typeHandler` 等扩展属性处换行，后续属性缩进 16 个空格。
+- SQL 关键字和标准函数名统一大写，例如 `SELECT`、`FROM`、`WHERE`、`AND`、`ORDER BY`、`NOW()`、`COUNT()`；
+  MyBatis 标签、参数名、列名、表名和字符串常量保持原有大小写。
+- `SELECT`、`FROM`、`WHERE`、`UPDATE`、`SET`、`INSERT INTO`、`VALUES`、`DELETE FROM` 等主要子句独占一行，
+  表名、字段、值和条件相对其子句再缩进一层。短小的 `ORDER BY id`、`GROUP BY type` 可以保持一行，多字段时按字段换行。
+- `WHERE` 中每个条件独占一行，第二个及后续条件的 `AND`、`OR` 独占一行；`SET` 中每个赋值独占一行。
+  只在同一个连续条件块或赋值块内用空格纵向对齐运算符，不跨 MyBatis 动态标签强行对齐。
+- 逗号放在当前字段、值或赋值行的行尾。`SELECT` 字段较多时优先使用 `<sql>` 和 `<include>` 复用，不写超长横向字段列表。
+- `<if>`、`<choose>`、`<when>`、`<otherwise>`、`<foreach>`、`<where>`、`<set>`、`<trim>` 等动态标签按 XML 层级缩进，
+  内部 SQL 在标签基础上再缩进一层；禁止把动态标签及其 SQL 内容压缩在同一行。
+- SQL 比较符包含 `<`、`>`、`<=` 或 `>=` 时，统一写成 `<![CDATA[ ... ]]>`，并在 CDATA 内侧保留一个空格；
+  不使用 `&lt;`、`&gt;` 等 XML 实体代替。
+
 ## 前后端契约
 
 - 前后端契约必须保持一致。
@@ -206,8 +257,9 @@ cd frontend && npm run check-i18n
 - 后端改动优先运行相关模块测试；影响公共模块、DAO、初始化、权限、SQL 执行或插件协议时扩大验证范围。
 - 前端改动优先运行 `npm run lint`、`npm run check-i18n` 和相关单测；用户可见流程变更要做浏览器级检查。
 - 可重复执行的前端浏览器测试流程统一维护在 `tests/frontend/`；一个用户流程只维护一份长期有效的流程文档，不按执行日期生成测试报告。
-- 前端用户可见行为、交互、布局、路由、权限、表单、状态流或接口契约发生变化时，浏览器测试前必须读取相关流程文档，测试后必须按当前真实实现创建或更新文档；具体格式和
-  Chrome 复测规则遵循 `frontend/AGENTS.md` 的“可复用的前端复测流程”章节。
+- 前端用户可见行为、交互、布局、路由、权限、表单、状态流或接口契约发生变化时，必须使用
+  [@Browser](plugin://browser@openai-bundled) 内置浏览器复测。测试前读取相关流程文档，测试后按当前真实实现创建或更新文档；具体格式和
+  @Browser 复测规则遵循 `frontend/AGENTS.md` 的“可复用的前端复测流程”章节。
 
 ## Review 规则
 

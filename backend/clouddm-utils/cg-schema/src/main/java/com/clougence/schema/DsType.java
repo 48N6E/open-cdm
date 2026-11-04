@@ -35,6 +35,7 @@ public enum DsType {
     PolarDBMySQL("pmy", "PolarDBMySQL"),
     PolarDbX("pox", "PolarDbX"),
     TiDB("ti", "TiDB"),
+    GoldenDB("gdb", "GoldenDB"),
     Lindorm("ld", "Lindorm"),
 
     // PostgreSQL family
@@ -55,6 +56,7 @@ public enum DsType {
     Db2("db2", "Db2"),
     ClickHouse("ck", "ClickHouse"),
     Kafka("ka", "Kafka"),
+    Etcd("et", "Etcd"),
     RocketMQ("rmq", "RocketMQ"),
     RabbitMQ("rbq", "RabbitMQ"),
     AutoMq("amq", "AutoMQ"),

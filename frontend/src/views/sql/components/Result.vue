@@ -1,11 +1,11 @@
 <template>
-  <div style="height: 100%" class="result-container">
+  <div style="height: 100%" class="result-container" :class="{ 'result-container--collapsed': tab.result.collapsed }">
     <div style="height: 100%; display: flex; flex-direction: column">
       <div class="tab-group">
         <a-tabs
           v-model:activeKey="tab.result.active"
           class="message-tabs"
-          :class="{ 'message-tabs--with-results': tab.result?.list?.length }"
+          :class="{ 'message-tabs--with-results': tab.result?.list?.length || tab.result.pending }"
           type="card"
           @tabClick="handleResultTabChange"
         >
@@ -18,7 +18,13 @@
             </template>
           </a-tab-pane>
         </a-tabs>
-        <a-tabs v-model:activeKey="tab.result.active" class="right" type="card" @tabClick="handleResultTabChange" v-if="tab.result?.list?.length">
+        <a-tabs
+          v-model:activeKey="tab.result.active"
+          class="right"
+          type="card"
+          @tabClick="handleResultTabChange"
+          v-if="tab.result?.list?.length || tab.result.pending"
+        >
           <a-tab-pane v-for="res in tab.result.list" :key="res.resultId" :name="res.resultId">
             <template #tab>
               <div @contextmenu.prevent.stop="onContextmenu($event, res)">
@@ -32,6 +38,14 @@
                   @click.native.stop="handleCloseResultTab('current', res.resultId)"
                 />
               </div>
+            </template>
+          </a-tab-pane>
+          <a-tab-pane v-if="tab.result.pending" :key="tab.result.pending.resultId" :name="tab.result.pending.resultId">
+            <template #tab>
+              <span class="result-pending-tab">
+                <span class="loading-spinner" />
+                {{ $t('jie-guo') }}{{ tab.result.pending.showIndex }}
+              </span>
             </template>
           </a-tab-pane>
           <template #rightExtra>
@@ -57,13 +71,34 @@
             </a-dropdown>
           </template>
         </a-tabs>
+        <button
+          type="button"
+          class="result-maximize-toggle"
+          :aria-label="tab.result.maximized ? $t('sqlResult.restore') : $t('sqlResult.maximize')"
+          :title="tab.result.maximized ? $t('sqlResult.restore') : $t('sqlResult.maximize')"
+          :aria-pressed="Boolean(tab.result.maximized)"
+          @click="toggleMaximize"
+        >
+          <FullscreenExitOutlined v-if="tab.result.maximized" />
+          <FullscreenOutlined v-else />
+        </button>
+        <button
+          type="button"
+          class="result-collapse-toggle"
+          :aria-label="tab.result.collapsed ? $t('sqlResult.expand') : $t('sqlResult.collapse')"
+          :title="tab.result.collapsed ? $t('sqlResult.expand') : $t('sqlResult.collapse')"
+          :aria-expanded="!tab.result.collapsed"
+          @click="toggleCollapse"
+        >
+          <DoubleRightOutlined :style="{ transform: tab.result.collapsed ? 'rotate(-90deg)' : 'rotate(90deg)' }" />
+        </button>
       </div>
       <div class="result-info-container" style="height: 100%" v-if="tab.result.active === 'message'">
         <div ref="resultInfoMessages" class="result-info-messages sql-editor-typography">
           <div v-for="(info, index) in tab.executeInfo" :key="index" class="result-info">
             <div class="info info--query" v-if="info.resultType === 'QueryScript'">
               <div class="level">{{ info.line }}</div>
-              <ExecutionSqlText class="message" :sql="info.script" />
+              <ExecutionSqlText class="message" :sql="info.script" :language="executionLanguage" />
             </div>
             <div
               class="info"
@@ -76,7 +111,7 @@
               <div class="time">[{{ info.time }}]</div>
               <div :class="`message ${info.level}`">
                 {{ info.message }}
-                <a href="#" v-if="info.message === $t('gui-ze-xiao-yan-shi-bai')" @click="handleViewNoPassedRuleList(index)">
+                <a href="#" v-if="info.message === $t('gui-ze-xiao-yan-shi-bai')" @click.prevent="handleViewNoPassedRuleList(index)">
                   {{ $t('cha-kan-xiang-qing') }}
                 </a>
               </div>
@@ -102,146 +137,171 @@
         class="result-content-wrapper"
         style="display: flex; flex-direction: column; flex: 1; min-height: 0"
       >
-        <div class="tip-footer">
-          <div class="tip-footer-main">
-            <div v-if="selectedTab.receiveMode !== 'STREAM'" class="tip-footer-page">
-              <div v-if="tab.running && selectedTab.receiveMode === 'PAGINATED' && paginatedLoading[selectedTab.resultId]" class="paginated-loading">
-                <div class="loading-spinner"></div>
-              </div>
-              <Page
-                :model-value="selectedTab.page"
-                :page-size="selectedTab.receiveMode === 'PAGINATED' ? 30 : 50"
-                :total="selectedTab.receiveMode === 'PAGINATED' ? selectedTab.fetchCount || selectedTab.total : selectedTab.total"
-                placement="top"
-                show-total
-                size="small"
-                @on-change="changePage($event)"
-              ></Page>
-            </div>
-            <div v-else class="stream-info">
-              <span>{{ $t('liu-shi-mo-shi-xian-shi-zui-xin-tiao-zong-ji-tiao', [selectedTab.fetchCount || selectedTab.total || 0]) }}</span>
-            </div>
-            <Poptip word-wrap trigger="hover" transfer placement="bottom" class="tip-footer-sql-pop">
-              <template #content>
-                <div v-if="selectedTab.rewriteTags?.length">
-                  {{ $t('zhong-xie-mo-kuai') }}
-                  <a-tag v-for="(tag, index) in selectedTab.rewriteTags" :key="index" color="blue">{{ tag }}</a-tag>
-                </div>
-                <div>
-                  {{ $t('yuan-shi-yu-ju') }}
-                  <span class="font-bold">{{ selectedTab.rewriteTags?.length ? selectedTab.original : selectedTab.querySql }}</span>
-                </div>
-              </template>
-              <span class="tip-footer-sql">
-                <a-tag v-if="selectedTab.queryType === 'plan'" color="green">{{ $t('ji-hua') }}</a-tag>
-                <a-tag v-if="selectedTab.rewriteTags?.length > 0" color="blue">{{ $t('zhong-xie') }}</a-tag>
-                {{ this.selectedTab.querySql }}
-              </span>
-            </Poptip>
-            <a-popover v-if="tab.cost && tab.cost.popIndex > -1 && selectedTab && selectedTab.resultId" class="cost-pop">
-              <template #content>
-                <div v-for="costPop in tab.cost.popList" :key="costPop.text">
-                  <a-icon :type="costPop.icon" :style="`color: ${costPop.color}`" :theme="costPop.theme" />
-                  {{ costPop.text }}
-                </div>
-              </template>
-              <div class="cost-pop-trigger" @click="handleClickCostPop">
-                <a-icon
-                  :type="tab.cost.popList[tab.cost.popIndex].icon"
-                  :style="`color: ${tab.cost.popList[tab.cost.popIndex].color}`"
-                  :theme="tab.cost.popList[tab.cost.popIndex].theme"
-                />
-                {{ tab.cost.popList[tab.cost.popIndex].text }}
-              </div>
-            </a-popover>
-          </div>
-          <div class="tip-footer-right">
-            <a-radio-group v-if="isMongoDbResult" v-model:value="mongoViewMode" size="small" class="mongo-result-view-switch">
-              <a-radio-button value="table">{{ $t('mongo-query-result-view-table') }}</a-radio-button>
-              <a-radio-button value="json">{{ $t('mongo-query-result-view-json') }}</a-radio-button>
-            </a-radio-group>
-            <div class="tip-footer-export" v-if="!selectedTab.exportState?.exporting && selectedTab.exportState?.percent !== 100">
-              <Poptip
-                v-if="selectedTab.exportState?.errorStatus === 'FAILED' && selectedTab.exportState?.errorMessage"
-                :content="selectedTab.exportState.errorMessage"
-                trigger="hover"
-                placement="top-end"
-                word-wrap
-                transfer
-              >
-                <CustomIcon type="icon-v2-ErrorColorful" size="16px" color="#ff4d4f" style="cursor: pointer" />
-              </Poptip>
-              <div class="tip-footer-export-btn" @click="handleResultExport">
-                <CustomIcon type="icon-v2-daochu" hoverStyle />
-                <span>{{ $t('dao-chu') }}</span>
-              </div>
-            </div>
-            <div class="download-warp">
-              <a v-if="selectedTab.exportState?.percent === 100" @click.prevent="resetTabExportState">{{ $t('fan-hui') }}</a>
-              <a v-if="selectedTab.exportState?.percent === 100" @click.prevent="openDownloadFileNameModal">{{ $t('xia-zai') }}</a>
-              <div v-if="selectedTab.exportState?.exporting" class="export-progress-modal">
-                <a-progress :percent="selectedTab.exportState?.percent || 0" size="small" style="width: 100px" />
-              </div>
-            </div>
-          </div>
+        <div v-if="selectedTab === tab.result.pending" class="result-pending" role="status" aria-live="polite">
+          <span class="result-pending-spinner" aria-hidden="true" />
+          <div class="result-pending-message">{{ selectedTab.message }}</div>
         </div>
-        <div class="result-table-container" v-if="selectedTab">
-          <div v-if="isMongoDbResult && mongoViewMode === 'json'" class="mongo-json-result-container" :style="{ maxHeight: `${tableScrollY}px` }">
-            <div v-if="!mongoJsonDocuments.length" class="mongo-json-empty">{{ $t('zan-wu-shu-ju') }}</div>
-            <div v-for="doc in mongoJsonDocuments" :key="`${selectedTab.resultId}-${doc.rowNumber}`" class="mongo-json-doc">
-              <div class="mongo-json-doc-header">
-                <span>{{ $t('mongo-result-document-index', [doc.rowNumber]) }}</span>
-                <span class="mongo-json-copy" @click="handleCopyMongoDocument(doc.text)">
-                  <cc-iconfont name="copy" :size="12" />
-                </span>
-              </div>
-              <pre class="mongo-json-doc-body">{{ doc.text }}</pre>
-            </div>
+        <template v-else>
+          <div class="result-summary">
+            <span role="status">{{ $t('query-fetched-count', [selectedTab.fetchCount || 0]) }}</span>
+            <Poptip v-if="selectedTab.querySql" trigger="click" transfer placement="top-start">
+              <template #content>
+                <div class="query-rewrite-details">
+                  <pre class="query-rewrite-sql">{{ selectedTab.querySql }}</pre>
+                </div>
+              </template>
+              <button type="button" class="result-summary-link">{{ $t('query-effective-statement') }}</button>
+            </Poptip>
+            <button type="button" class="result-summary-link" @click="handleResultTabChange('message')">{{ $t('zhi-hang-xin-xi') }}</button>
           </div>
-          <a-table
-            v-else
-            class="result-set-style"
-            :class="{ 'result-set-style--empty': !selectedTab.showData?.length }"
-            :ref="`result_table_${tab.result.active}`"
-            :columns="antdColumns"
-            :dataSource="selectedTab.showData"
-            :pagination="false"
-            :scroll="tableScroll"
-            size="small"
-            bordered
-            :rowKey="(record, index) => index"
-            :customRow="handleCustomRow"
-          >
-            <template #headerCell="{ column }">
-              <div class="header-cell-content">
-                <a-tooltip :title="column.originalTitle || column.title" placement="top">
-                  <span class="header-title">{{ column.originalTitle || column.title }}</span>
-                </a-tooltip>
-                <div v-if="column.resizable" class="resize-handle" @mousedown.stop="handleResize($event, column)" @click.stop></div>
+          <div class="tip-footer">
+            <div class="tip-footer-main">
+              <div v-if="selectedTab.receiveMode !== 'STREAM'" class="tip-footer-page">
+                <div
+                  v-if="
+                    (tab.running || selectedTab.refreshOnProgress) &&
+                    selectedTab.receiveMode === 'PAGINATED' &&
+                    paginatedLoading[selectedTab.resultId]
+                  "
+                  class="paginated-loading"
+                >
+                  <div class="loading-spinner"></div>
+                </div>
+                <Page
+                  :model-value="selectedTab.page"
+                  :page-size="selectedTab.receiveMode === 'PAGINATED' ? 30 : 50"
+                  :total="selectedTab.receiveMode === 'PAGINATED' ? selectedTab.fetchCount || selectedTab.total : selectedTab.total"
+                  placement="top"
+                  show-total
+                  size="small"
+                  @on-change="changePage($event)"
+                ></Page>
               </div>
-            </template>
-            <template #bodyCell="{ column, record, index }">
-              <template v-if="column.dataIndex !== 'seq'">
-                <div class="vxe-input-tpl" @dblclick.stop="handleCellDetail(record, column, index)">
-                  <span v-if="record[column.dataIndex] === null" style="color: #ccc; font-style: italic">NULL</span>
-                  <pre v-else style="overflow: hidden; margin: 0">{{ record[column.dataIndex] }}</pre>
-                  <div v-if="!getCellComplete(column, index)" class="cell-incomplete-badge"></div>
-                  <div class="op">
-                    <div @click.stop="handleCellCopy(record, column, index)" style="margin-right: 3px">
-                      <cc-iconfont name="copy" :size="12" />
+              <div v-else class="stream-info">
+                <span>{{ $t('liu-shi-mo-shi-xian-shi-zui-xin-tiao-zong-ji-tiao', [selectedTab.fetchCount || selectedTab.total || 0]) }}</span>
+              </div>
+              <a-tag v-if="selectedTab.queryType === 'plan'" color="green">{{ $t('ji-hua') }}</a-tag>
+              <Poptip v-if="selectedTab.rewriteTags?.length" trigger="hover" transfer placement="top-start" class="tip-footer-sql-pop">
+                <template #content>
+                  <div class="query-rewrite-details">
+                    <div class="query-rewrite-section">
+                      <div class="query-rewrite-label">{{ $t('zhong-xie-mo-kuai') }}</div>
+                      <div class="query-rewrite-tags">
+                        <a-tag v-for="(tag, index) in selectedTab.rewriteTags" :key="index" color="blue">{{ tag }}</a-tag>
+                      </div>
                     </div>
-                    <div @click.stop="handleCellDetail(record, column, index)">
-                      <cc-iconfont name="eye" :size="12" />
+                    <div class="query-rewrite-section">
+                      <div class="query-rewrite-label">{{ $t('yuan-shi-yu-ju') }}</div>
+                      <pre class="query-rewrite-sql">{{ selectedTab.original }}</pre>
+                    </div>
+                    <div class="query-rewrite-section">
+                      <div class="query-rewrite-label">{{ $t('gai-xie-yu-ju') }}</div>
+                      <pre class="query-rewrite-sql">{{ selectedTab.querySql }}</pre>
                     </div>
                   </div>
+                </template>
+                <a-tag color="blue">{{ $t('zhong-xie') }}</a-tag>
+              </Poptip>
+              <a-popover v-if="selectedTab.cost && selectedTab.cost.popIndex > -1 && selectedTab && selectedTab.resultId" class="cost-pop">
+                <template #content>
+                  <div v-for="costPop in selectedTab.cost.popList" :key="costPop.text">
+                    <a-icon :type="costPop.icon" :style="`color: ${costPop.color}`" :theme="costPop.theme" />
+                    {{ costPop.text }}
+                  </div>
+                </template>
+                <div class="cost-pop-trigger" @click="handleClickCostPop">
+                  <a-icon
+                    :type="selectedTab.cost.popList[selectedTab.cost.popIndex].icon"
+                    :style="`color: ${selectedTab.cost.popList[selectedTab.cost.popIndex].color}`"
+                    :theme="selectedTab.cost.popList[selectedTab.cost.popIndex].theme"
+                  />
+                  {{ selectedTab.cost.popList[selectedTab.cost.popIndex].text }}
+                </div>
+              </a-popover>
+            </div>
+            <div class="tip-footer-right">
+              <div
+                class="tip-footer-transpose-btn"
+                :class="{ 'tip-footer-transpose-btn--active': selectedTab.transposed }"
+                v-if="selectedTab.receiveMode !== 'STREAM'"
+                @click="toggleTranspose"
+              >
+                <CustomIcon type="icon-v2-qiehuanmoshi2" hoverStyle />
+                <span>{{ $t('sqlResult.transpose') }}</span>
+              </div>
+              <div class="tip-footer-export" v-if="!selectedTab.exportState?.exporting && selectedTab.exportState?.percent !== 100">
+                <Poptip
+                  v-if="selectedTab.exportState?.errorStatus === 'FAILED' && selectedTab.exportState?.errorMessage"
+                  :content="selectedTab.exportState.errorMessage"
+                  trigger="hover"
+                  placement="top-end"
+                  word-wrap
+                  transfer
+                >
+                  <CustomIcon type="icon-v2-ErrorColorful" size="16px" color="#ff4d4f" style="cursor: pointer" />
+                </Poptip>
+                <div class="tip-footer-export-btn" @click="handleResultExport">
+                  <CustomIcon type="icon-v2-daochu" hoverStyle />
+                  <span>{{ $t('dao-chu') }}</span>
+                </div>
+              </div>
+              <div class="download-warp">
+                <a v-if="selectedTab.exportState?.percent === 100" @click.prevent="resetTabExportState">{{ $t('fan-hui') }}</a>
+                <a v-if="selectedTab.exportState?.percent === 100" @click.prevent="openDownloadFileNameModal">{{ $t('xia-zai') }}</a>
+                <div v-if="selectedTab.exportState?.exporting" class="export-progress-modal">
+                  <a-progress :percent="selectedTab.exportState?.percent || 0" size="small" style="width: 100px" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="result-table-container" v-if="selectedTab">
+            <a-table
+              class="result-set-style"
+              :class="{ 'result-set-style--empty': !selectedTab.showData?.length }"
+              :ref="`result_table_${tab.result.active}`"
+              :columns="antdColumns"
+              :dataSource="displayData"
+              :pagination="false"
+              :scroll="tableScroll"
+              size="small"
+              bordered
+              :rowKey="(record, index) => index"
+              :customRow="handleCustomRow"
+            >
+              <template #headerCell="{ column }">
+                <div class="header-cell-content">
+                  <a-tooltip :title="column.originalTitle || column.title" placement="top">
+                    <span class="header-title">{{ column.originalTitle || column.title }}</span>
+                  </a-tooltip>
+                  <div v-if="column.resizable" class="resize-handle" @mousedown.stop="handleResize($event, column)" @click.stop></div>
                 </div>
               </template>
-              <template v-else>
-                <span>{{ getRowNumber(index) }}</span>
+              <template #bodyCell="{ column, record, index }">
+                <template v-if="column.dataIndex === 'seq'">
+                  <span>{{ getRowNumber(index) }}</span>
+                </template>
+                <template v-else-if="selectedTab.transposed && column.dataIndex === '__field__'">
+                  <div class="transposed-field-cell">{{ record.__field__ }}</div>
+                </template>
+                <template v-else>
+                  <div class="vxe-input-tpl" @dblclick.stop="handleCellDetail(record, column, index)">
+                    <span v-if="record[column.dataIndex] === null" style="color: #ccc; font-style: italic">NULL</span>
+                    <pre v-else style="overflow: hidden; margin: 0">{{ record[column.dataIndex] }}</pre>
+                    <div v-if="!getCellComplete(column, index)" class="cell-incomplete-badge"></div>
+                    <div class="op">
+                      <div @click.stop="handleCellCopy(record, column, index)" style="margin-right: 3px">
+                        <cc-iconfont name="copy" :size="12" />
+                      </div>
+                      <div @click.stop="handleCellDetail(record, column, index)">
+                        <cc-iconfont name="eye" :size="12" />
+                      </div>
+                    </div>
+                  </div>
+                </template>
               </template>
-            </template>
-          </a-table>
-        </div>
+            </a-table>
+          </div>
+        </template>
       </div>
     </div>
     <CCModal v-model="showInsertSqlModal" @on-cancel="hideShowInsertSqlModal" title="Insert SQL" :width="1000" :mask-closable="false" transfer>
@@ -452,13 +512,16 @@
 <script lang="jsx">
 import appLogger from '@/utils/logger';
 import dayjs from 'dayjs';
+import { DoubleRightOutlined, FullscreenExitOutlined, FullscreenOutlined } from '@ant-design/icons-vue';
 import { Modal, Tooltip } from 'ant-design-vue';
 import { mysqlInsert, pgInsert } from '@/views/sql/components/typeGroup';
 import copyMixin from '@/mixins/copyMixin';
 import { EVENT_BUS_NAME_LIST } from '@/utils/eventBusName';
+import { isMySQL } from '@/utils';
 import { mapGetters, mapState } from 'vuex';
 import CustomIcon from '@/components/function/CustomIcon.vue';
 import ExecutionSqlText from '@/views/sql/components/ExecutionSqlText.vue';
+import { getBaseEditorLanguage } from '@/components/editor/sqlLanguage';
 import ContextMenu from '@imengyu/vue3-context-menu';
 import XEClipboard from 'xe-clipboard';
 
@@ -469,6 +532,9 @@ export default {
     tab: Object
   },
   components: {
+    DoubleRightOutlined,
+    FullscreenExitOutlined,
+    FullscreenOutlined,
     CustomIcon,
     ExecutionSqlText
     // AsyncJobDetail,
@@ -476,7 +542,6 @@ export default {
   },
   data() {
     return {
-      exportTypes: [],
       contextData: null,
       actionType: '',
       currentTableName: '',
@@ -511,9 +576,6 @@ export default {
       columnSelectAll: true,
       rowIndex: 0,
       pageHeight: 0,
-      mongoResultViewMode: {},
-      mongoJsonHydratedDocs: [],
-      mongoJsonHydrateToken: 0,
       tableMenu: {
         body: {
           options: [
@@ -540,6 +602,8 @@ export default {
       editorHeight: 250,
       paginatedLoading: {}, // Loading status for each result set
       paginatedLoadingTimers: {}, // Loading timers keyed by result set
+      paginatedRequests: {}, // Latest page request for each result set
+      paginatedRequestId: 0,
       columnWidths: {}, // Stored column widths
       tableScrollY: 240,
       tableResizeObserver: null
@@ -548,6 +612,12 @@ export default {
   computed: {
     ...mapState(['dmGlobalSetting']),
     ...mapGetters(['getQualifier']),
+    executionLanguage() {
+      return getBaseEditorLanguage(this.tab.dsType);
+    },
+    exportTypes() {
+      return this.dmGlobalSetting.fmtConvertDef || [];
+    },
     filteredColumns() {
       const keyword = (this.columnSearch || '').toLowerCase();
       return (this.insertOption.columns || []).filter((c) => !keyword || (c.columnName || '').toLowerCase().includes(keyword));
@@ -580,6 +650,7 @@ export default {
       if (['message', 'async'].includes(this.tab.result.active)) {
         return {};
       }
+      if (this.tab.result.pending?.resultId === this.tab.result.active) return this.tab.result.pending;
       const matched = this.tab.result.list.find((item) => item.resultId === this.tab.result.active);
       return matched || {};
     },
@@ -587,12 +658,17 @@ export default {
       return {
         resultId: this.selectedTab.resultId,
         receiveMode: this.selectedTab.receiveMode,
-        fetchCount: this.selectedTab.fetchCount
+        refreshOnProgress: this.selectedTab.refreshOnProgress,
+        fetchCount: this.selectedTab.fetchCount,
+        page: this.selectedTab.page
       };
     },
     antdColumns() {
       if (!this.selectedTab || !this.selectedTab.columnListSeq) {
         return [];
+      }
+      if (this.selectedTab.transposed) {
+        return this.transposedAntdColumns;
       }
       return this.selectedTab.columnListSeq.map((col, index) => {
         const colKey = col.type === 'seq' ? 'seq' : col.field;
@@ -624,7 +700,7 @@ export default {
     },
     tableScroll() {
       return {
-        x: 'max-content',
+        x: this.antdColumns.reduce((sum, col) => sum + (col.width || 100), 0),
         y: this.tableScrollY
       };
     },
@@ -697,10 +773,110 @@ export default {
       },
       immediate: false
     },
+
+    displayData() {
+      const tab = this.selectedTab;
+      if (!tab.transposed) {
+        return tab.showData;
+      }
+      const columnList = tab.columnList || [];
+      const sourceRows = this.transposedSourceRows;
+      return columnList.map((columnName, colIndex) => {
+        const record = { __field__: columnName };
+        sourceRows.forEach((item, rowIndex) => {
+          const rowData = item.data || item.row;
+          const cell = rowData ? rowData[colIndex] : null;
+          if (cell) {
+            record[`__r${rowIndex}`] = cell.value;
+          }
+        });
+        return record;
+      });
+    },
+    // Raw row objects for the current page; the transposed view is built from these arrays instead of
+    // the name-keyed showData objects so duplicate column names keep their own rows.
+    transposedSourceRows() {
+      const tab = this.selectedTab;
+      if ((tab.receiveMode || 'PAGE_FULL') === 'PAGINATED') {
+        return tab.rowSetCache?.[tab.page || 1] || [];
+      }
+      const page = tab.page || 1;
+      const size = tab.size || 50;
+      const start = (page - 1) * size;
+      return (tab.data || []).slice(start, start + size);
+    },
+    transposedAntdColumns() {
+      const columns = [
+        {
+          title: this.$t('zi-duan-ming-cheng'),
+          dataIndex: '__field__',
+          key: '__field__',
+          width: this.columnWidths.__field__ || 160,
+          fixed: 'left',
+          resizable: true,
+          originalTitle: this.$t('zi-duan-ming-cheng')
+        }
+      ];
+      this.transposedSourceRows.forEach((item, index) => {
+        const key = `__r${index}`;
+        const rowNumber = String(this.getRowNumber(index));
+        columns.push({
+          title: rowNumber,
+          dataIndex: key,
+          key,
+          width: this.columnWidths[key] || 100,
+          ellipsis: {
+            showTitle: true
+          },
+          resizable: true,
+          originalTitle: rowNumber,
+          sourceRowIndex: index
+        });
+      });
+      return columns;
+    }
+  },
+  watch: {
+    selectedResultProgress: {
+      handler(current, previous) {
+        if (current.refreshOnProgress) {
+          if (current.receiveMode === 'PAGINATED' && current.resultId && current.fetchCount > 0) {
+            // Progress is published after cached rows are flushed.
+            this.changePage(current.page);
+          }
+          return;
+        }
+        if (!this.tab.running || current.receiveMode !== 'PAGINATED' || !current.resultId) {
+          return;
+        }
+        if (!previous || current.resultId !== previous.resultId) {
+          return;
+        }
+        if (current.fetchCount === undefined || previous.fetchCount === undefined || current.fetchCount <= previous.fetchCount) {
+          return;
+        }
+
+        const resultId = current.resultId;
+        this.paginatedLoading[resultId] = true;
+        if (this.paginatedLoadingTimers[resultId]) {
+          clearTimeout(this.paginatedLoadingTimers[resultId]);
+        }
+        this.paginatedLoadingTimers[resultId] = setTimeout(() => {
+          this.paginatedLoading[resultId] = false;
+          delete this.paginatedLoadingTimers[resultId];
+        }, 2000);
+      },
+      immediate: true
+    },
     'tab.running': {
       handler(running) {
         if (running) {
+          this.tab.result.collapsed = false;
           return;
+        }
+        if (this.tab.result.pending) {
+          if (this.tab.result.active === this.tab.result.pending.resultId) this.tab.result.active = 'message';
+          this.tab.result.pending = null;
         }
         const loadingTimerIds = Object.keys(this.paginatedLoadingTimers);
         for (let i = 0; i < loadingTimerIds.length; i++) {
@@ -714,7 +890,7 @@ export default {
       }
     },
     'tab.result.list.length'(length) {
-      if (!length && !['message', 'async'].includes(this.tab.result.active)) {
+      if (!length && !this.tab.result.pending && !['message', 'async'].includes(this.tab.result.active)) {
         this.tab.result.active = 'message';
       }
     },
@@ -725,32 +901,10 @@ export default {
       }
       this.$nextTick(() => {
         this.initTableScrollObserver();
-        this.hydrateMongoJsonDocuments();
       });
-    },
-    mongoViewMode(mode) {
-      if (mode !== 'json') {
-        this.mongoJsonHydratedDocs = [];
-        return;
-      }
-      this.hydrateMongoJsonDocuments();
-    },
-    'selectedTab.resultId'() {
-      this.mongoJsonHydratedDocs = [];
-      if (this.mongoViewMode === 'json') {
-        this.hydrateMongoJsonDocuments();
-      }
-    },
-    'selectedTab.showData': {
-      handler() {
-        if (this.mongoViewMode === 'json') {
-          this.hydrateMongoJsonDocuments();
-        }
-      }
     }
   },
   mounted() {
-    this.exportTypes = this.dmGlobalSetting.fmtConvertDef;
     this.initAllTabsExportState();
     this.$bus.on(EVENT_BUS_NAME_LIST.GET_RESULT_EXPORT_INFO, (info) => {
       // Export info events contain resultId in ResultSetMeta, so cacheFile no longer needs separate handling.
@@ -801,12 +955,28 @@ export default {
     this.$bus.off('consoleMessageAppend');
     this.$bus.off(EVENT_BUS_NAME_LIST.GET_RESULT_EXPORT_INFO);
     this.$bus.off(EVENT_BUS_NAME_LIST.WS_RES_EXPORT_EVENT);
+    this.paginatedRequests = {};
     const loadingTimerIds = Object.keys(this.paginatedLoadingTimers);
     for (let i = 0; i < loadingTimerIds.length; i++) {
       clearTimeout(this.paginatedLoadingTimers[loadingTimerIds[i]]);
     }
   },
   methods: {
+    toggleMaximize() {
+      const result = this.tab.result;
+      if (result.maximized) {
+        result.maximized = false;
+        result.collapsed = result.collapsedBeforeMaximize;
+      } else {
+        result.collapsedBeforeMaximize = result.collapsed;
+        result.collapsed = false;
+        result.maximized = true;
+      }
+    },
+    toggleCollapse() {
+      this.tab.result.maximized = false;
+      this.tab.result.collapsed = !this.tab.result.collapsed;
+    },
     handleClickCostPop() {
       appLogger.warn(123, this.tab);
     },
@@ -887,7 +1057,9 @@ export default {
         }
         this.tab.result.list.splice(deleteIndex, 1);
         const activeIndex = deleteIndex ? deleteIndex - 1 : 0;
-        this.tab.result.active = this.tab.result.list.length ? this.tab.result.list[activeIndex].resultId : 'message';
+        if (this.tab.result.active !== this.tab.result.pending?.resultId) {
+          this.tab.result.active = this.tab.result.list.length ? this.tab.result.list[activeIndex].resultId : 'message';
+        }
       } else if (type === 'other') {
         if (this.contextData.resultId === 'message') {
           this.tab.result.active = 'message';
@@ -931,8 +1103,9 @@ export default {
       });
     },
     handleResultTabChange(activeKey) {
+      this.tab.result.collapsed = false;
       if (activeKey !== 'message' && activeKey !== 'async') {
-        const exists = this.tab.result.list.some((item) => item.resultId === activeKey);
+        const exists = this.tab.result.pending?.resultId === activeKey || this.tab.result.list.some((item) => item.resultId === activeKey);
         if (!exists) {
           this.tab.result.active = 'message';
           activeKey = 'message';
@@ -1042,15 +1215,68 @@ export default {
       this.showInsertSqlModal = false;
       this.currentTableName = '';
     },
+    formatMongoDocumentText(row) {
+      try {
+        const cols = this.mongoJsonColumnList;
+        if (cols.length === 1 && cols[0] === 'RESULT') {
+          const raw = row.RESULT;
+          if (raw === null || raw === undefined) {
+            return 'null';
+          }
+          if (typeof raw === 'string') {
+            const parsed = this.normalizeMongoFieldValue(raw);
+            if (parsed !== null && typeof parsed === 'object') {
+              return JSON.stringify(parsed, null, 2);
+            }
+            // mongosh shell format (ISODate/Timestamp/NumberLong/...) — show as-is
+            return raw;
+          }
+          return JSON.stringify(raw, null, 2);
+        }
+        return JSON.stringify(this.buildMongoDocumentFromRow(row), null, 2);
+      } catch (e) {
+        return String(row);
+      }
+    },
+
+    normalizeMongoFieldValue(value) {
+      if (value === null || value === undefined) {
+        return null;
+      }
+      if (typeof value !== 'string') {
+        return value;
+      }
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return value;
+      }
+      const maybeJson = (trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'));
+      if (!maybeJson) {
+        return value;
+      }
+      try {
+        return JSON.parse(trimmed);
+      } catch (e) {
+        return value;
+      }
+    },
+
     handleCustomRow(record, index) {
-      return {
+      const handlers = {
         onClick: (event) => {
           this.handleRowClick(record, index, event);
-        },
-        onContextmenu: (event) => {
-          this.handleRowContextMenu(record, index, event);
         }
       };
+      // In the transposed view a displayed row is a source column, so the row-level menu does not apply.
+      if (!this.selectedTab.transposed) {
+        handlers.onContextmenu = (event) => {
+          this.handleRowContextMenu(record, index, event);
+        };
+      }
+      return handlers;
+    },
+    toggleTranspose() {
+      this.selectedTab.transposed = !this.selectedTab.transposed;
     },
     handleRowClick(record, index, event) {
       // Handle row clicks.
@@ -1090,9 +1316,9 @@ export default {
       const cellMeta = this.getCellValueMeta(column, rowIndex);
       if (cellMeta && !cellMeta.error && !cellMeta.mask && cellMeta.moreSize > 0) {
         try {
-          text = await this.fetchFullCellText(cellMeta, text);
+          text = await this.fetchFullCellText(cellMeta);
         } catch (error) {
-          appLogger.error('复制单元格完整内容失败:', error);
+          appLogger.error('Failed to copy the full cell value:', error);
           this.$Message.error(this.$t('fu-zhi-shi-bai'));
           return;
         }
@@ -1109,20 +1335,29 @@ export default {
         return ((this.selectedTab.page || 1) - 1) * pageSize + rowIndex;
       }
       if (receiveMode === 'STREAM') {
-        return rowIndex;
+        return Math.max(0, this.selectedTab.streamData.length - 30) + rowIndex;
       }
       const pageSize = this.selectedTab.size || 50;
       return ((this.selectedTab.page || 1) - 1) * pageSize + rowIndex;
     },
     getCellValueMeta(column, rowIndex) {
-      const colIndex = this.selectedTab.columnList?.findIndex((col) => col === column.dataIndex || col === column.property) ?? -1;
-      if (colIndex < 0) {
+      // Under transpose the display row is the source column and the display column is the source row.
+      let colIndex;
+      let sourceRowIndex;
+      if (this.selectedTab.transposed) {
+        colIndex = rowIndex;
+        sourceRowIndex = column.sourceRowIndex;
+      } else {
+        colIndex = this.selectedTab.columnList?.findIndex((col) => col === column.dataIndex || col === column.property) ?? -1;
+        sourceRowIndex = rowIndex;
+      }
+      if (colIndex < 0 || sourceRowIndex === undefined || sourceRowIndex < 0) {
         return null;
       }
 
       const meta = {
         resultId: this.selectedTab.resultId,
-        rowNumber: this.getCellRowNumber(rowIndex),
+        rowNumber: this.getCellRowNumber(sourceRowIndex),
         colIndex,
         complete: true,
         moreSize: 0,
@@ -1138,8 +1373,8 @@ export default {
         if (receiveMode === 'PAGINATED') {
           const currentPage = this.selectedTab.page || 1;
           const rowSetCache = this.selectedTab.rowSetCache;
-          if (rowSetCache && rowSetCache[currentPage] && rowSetCache[currentPage][rowIndex]) {
-            const rowItem = rowSetCache[currentPage][rowIndex];
+          if (rowSetCache && rowSetCache[currentPage] && rowSetCache[currentPage][sourceRowIndex]) {
+            const rowItem = rowSetCache[currentPage][sourceRowIndex];
             const rowData = rowItem.data || rowItem.row;
             if (rowData && Array.isArray(rowData) && rowData[colIndex]) {
               cellValue = rowData[colIndex];
@@ -1147,12 +1382,8 @@ export default {
           }
         } else if (receiveMode === 'STREAM') {
           const rowSetStream = this.selectedTab.rowSetStream;
-          const streamData = this.selectedTab.streamData || [];
-          const displayCount = 30;
-          const startIndex = streamData.length > displayCount ? streamData.length - displayCount : 0;
-          const actualIndex = startIndex + rowIndex;
-          if (rowSetStream && rowSetStream[actualIndex]) {
-            const rowItem = rowSetStream[actualIndex];
+          if (rowSetStream && rowSetStream[sourceRowIndex]) {
+            const rowItem = rowSetStream[sourceRowIndex];
             const rowData = rowItem.data || rowItem.row;
             if (rowData && Array.isArray(rowData) && rowData[colIndex]) {
               cellValue = rowData[colIndex];
@@ -1179,10 +1410,11 @@ export default {
 
       return meta;
     },
-    async fetchFullCellText(cellMeta, initialValue) {
-      let content = initialValue || '';
+    async fetchFullCellText(cellMeta) {
+      let content = '';
       let moreSize = cellMeta.moreSize || 0;
       const fetchSize = 128 * 1024;
+      let offset = 0;
       let guard = 0;
 
       while (moreSize > 0 && guard < 100) {
@@ -1192,7 +1424,7 @@ export default {
             resultId: cellMeta.resultId,
             rowNumber: cellMeta.rowNumber,
             colNumber: cellMeta.colIndex,
-            offset: content.length,
+            offset,
             fetchSize
           }
         });
@@ -1201,7 +1433,7 @@ export default {
           throw new Error(res.message || 'fetch failed');
         }
 
-        const dataValue = res.data.value || res.data;
+        const dataValue = res.data.value;
         if (dataValue.error) {
           throw new Error('fetch error');
         }
@@ -1212,10 +1444,13 @@ export default {
         }
 
         content += chunk;
+        // Offsets count characters for text and bytes for binary values, not rendered hex characters.
+        offset += fetchSize;
         moreSize = dataValue.moreSize || 0;
-        if (dataValue.complete) {
-          break;
-        }
+      }
+
+      if (moreSize > 0) {
+        throw new Error('Cell value exceeds the copy fetch limit');
       }
 
       return content;
@@ -1226,124 +1461,7 @@ export default {
       if (!cellMeta) {
         return true;
       }
-      if (cellMeta.moreSize > 0) {
-        return false;
-      }
       return cellMeta.complete;
-    },
-    normalizeMongoFieldValue(value) {
-      if (value === null || value === undefined) {
-        return null;
-      }
-      if (typeof value !== 'string') {
-        return value;
-      }
-      const trimmed = value.trim();
-      if (!trimmed) {
-        return value;
-      }
-      const maybeJson = (trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'));
-      if (!maybeJson) {
-        return value;
-      }
-      try {
-        return JSON.parse(trimmed);
-      } catch (e) {
-        return value;
-      }
-    },
-    buildMongoDocumentFromRow(row) {
-      const doc = {};
-      this.mongoJsonColumnList.forEach((col) => {
-        doc[col] = this.normalizeMongoFieldValue(row[col]);
-      });
-      return doc;
-    },
-    formatMongoDocumentText(row) {
-      try {
-        const cols = this.mongoJsonColumnList;
-        if (cols.length === 1 && cols[0] === 'RESULT') {
-          const raw = row.RESULT;
-          if (raw === null || raw === undefined) {
-            return 'null';
-          }
-          if (typeof raw === 'string') {
-            const parsed = this.normalizeMongoFieldValue(raw);
-            if (parsed !== null && typeof parsed === 'object') {
-              return JSON.stringify(parsed, null, 2);
-            }
-            // mongosh shell format (ISODate/Timestamp/NumberLong/...) — show as-is
-            return raw;
-          }
-          return JSON.stringify(raw, null, 2);
-        }
-        return JSON.stringify(this.buildMongoDocumentFromRow(row), null, 2);
-      } catch (e) {
-        return String(row);
-      }
-    },
-    async hydrateMongoJsonDocuments() {
-      if (!this.isMongoDbResult || this.mongoViewMode !== 'json') {
-        return;
-      }
-      const rows = this.selectedTab?.showData || [];
-      if (!rows.length) {
-        this.mongoJsonHydratedDocs = [];
-        return;
-      }
-
-      const token = this.mongoJsonHydrateToken + 1;
-      this.mongoJsonHydrateToken = token;
-      const docs = [];
-
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        let text = this.formatMongoDocumentText(row);
-        const cols = this.mongoJsonColumnList;
-        if (cols.length === 1 && cols[0] === 'RESULT') {
-          const cellMeta = this.getCellValueMeta({ dataIndex: 'RESULT' }, i);
-          if (cellMeta && !cellMeta.error && cellMeta.moreSize > 0) {
-            try {
-              text = await this.fetchFullCellText(cellMeta, typeof row.RESULT === 'string' ? row.RESULT : text);
-              const parsed = this.normalizeMongoFieldValue(text);
-              if (parsed !== null && typeof parsed === 'object') {
-                text = JSON.stringify(parsed, null, 2);
-              }
-            } catch (err) {
-              // No result-cache file (or Windows URI parse failure) — keep preview text.
-              appLogger.debug('hydrate mongo json result failed:', err);
-            }
-          }
-        } else {
-          const hydratedRow = { ...row };
-          for (let c = 0; c < cols.length; c++) {
-            const col = cols[c];
-            const cellMeta = this.getCellValueMeta({ dataIndex: col }, i);
-            if (!cellMeta || cellMeta.error || !(cellMeta.moreSize > 0)) {
-              continue;
-            }
-            try {
-              const initial = typeof row[col] === 'string' ? row[col] : '';
-              hydratedRow[col] = await this.fetchFullCellText(cellMeta, initial);
-            } catch (err) {
-              appLogger.debug('hydrate mongo json field failed:', err);
-            }
-          }
-          text = this.formatMongoDocumentText(hydratedRow);
-        }
-        docs.push({
-          rowNumber: this.getRowNumber(i),
-          text
-        });
-      }
-
-      if (token !== this.mongoJsonHydrateToken) {
-        return;
-      }
-      this.mongoJsonHydratedDocs = docs;
-    },
-    handleCopyMongoDocument(text) {
-      this.copyText(text);
     },
     handleCellDetail(record, column, rowIndex) {
       const cellMeta = this.getCellValueMeta(column, rowIndex);
@@ -1359,13 +1477,20 @@ export default {
           const normalized = this.normalizeMongoFieldValue(cellValue);
           if (typeof normalized !== 'string') {
             cellValue = JSON.stringify(normalized, null, 2);
+          } else {
+            cellValue = normalized;
           }
         }
+      }
+      // Under transpose the field-name column holds the source column name for this record.
+      let property = column.dataIndex || column.property;
+      if (this.selectedTab.transposed) {
+        property = record.__field__;
       }
 
       this.$bus.emit('showCellDetailModal', {
         row: record,
-        column: { property: column.dataIndex || column.property },
+        column: { property, columnType: this.selectedTab.columnType?.[colIndex] },
         resultId: this.selectedTab.resultId,
         rowNumber,
         colNumber: colIndex,
@@ -1390,7 +1515,7 @@ export default {
       columnList.forEach((key1, index) => {
         const value = row[key1];
         let insertType;
-        if (this.tab.dataSourceType === 'MySQL') {
+        if (isMySQL(this.tab.dataSourceType)) {
           insertType = mysqlInsert;
         } else {
           insertType = pgInsert;
@@ -1525,13 +1650,27 @@ export default {
         const pageSize = 30;
         const offsetRow = (page - 1) * pageSize;
 
-        // Check cache.
-        if (tab.pageCache && tab.pageCache[page]) {
+        const expectedRows = Math.min(pageSize, Math.max(0, tab.fetchCount - offsetRow));
+        // A cached partial page becomes stale as additional rows arrive.
+        const cachedPage = tab.pageCache?.[page];
+        if (cachedPage && (!tab.refreshOnProgress || cachedPage.length >= expectedRows)) {
+          delete this.paginatedRequests[tab.resultId];
+          if (tab.refreshOnProgress) {
+            this.paginatedLoading[tab.resultId] = false;
+          }
           tab.showData = tab.pageCache[page];
           return;
         }
 
-        // Call API to fetch data.
+        const pending = this.paginatedRequests[tab.resultId];
+        if (pending && pending.page === page && pending.fetchCount === tab.fetchCount) {
+          return;
+        }
+        const request = { id: ++this.paginatedRequestId, page, fetchCount: tab.fetchCount };
+        this.paginatedRequests[tab.resultId] = request;
+        if (tab.refreshOnProgress) {
+          this.paginatedLoading[tab.resultId] = true;
+        }
         try {
           const res = await this.$services.dmQueryFetchResultPage({
             data: {
@@ -1541,6 +1680,9 @@ export default {
             }
           });
 
+          if (this.paginatedRequests[tab.resultId]?.id !== request.id) {
+            return;
+          }
           if (res.success && res.data && res.data.rowSet) {
             const { rowSet } = res.data;
             const { columnList } = tab;
@@ -1564,8 +1706,14 @@ export default {
             if (!tab.pageCache) {
               tab.pageCache = {};
             }
+            // A WebSocket result may have filled this page while the request was in flight.
+            if (tab.refreshOnProgress && tab.pageCache[page]?.length > list.length) {
+              return;
+            }
             tab.pageCache[page] = list;
-            tab.showData = list;
+            if (tab.page === page) {
+              tab.showData = list;
+            }
             // Save original rowSet data for moreSize and other metadata.
             if (!tab.rowSetCache) {
               tab.rowSetCache = {};
@@ -1573,11 +1721,18 @@ export default {
             tab.rowSetCache[page] = rowSet; // Save raw data from the current page
           }
         } catch (error) {
-          appLogger.error('获取分页数据失败:', error);
-          this.$Message.error(this.$t('huo-qu-fen-ye-shu-ju-shi-bai'));
+          if (this.paginatedRequests[tab.resultId]?.id === request.id) {
+            appLogger.error('获取分页数据失败:', error);
+            this.$Message.error(this.$t('huo-qu-fen-ye-shu-ju-shi-bai'));
+          }
+        } finally {
+          if (this.paginatedRequests[tab.resultId]?.id === request.id) {
+            delete this.paginatedRequests[tab.resultId];
+            if (tab.refreshOnProgress) {
+              this.paginatedLoading[tab.resultId] = false;
+            }
+          }
         }
-      } else if (receiveMode === 'STREAM') {
-        tab.page = page;
       } else {
         tab.page = page;
         tab.showData = tab.dataArr[page - 1];
@@ -1954,6 +2109,48 @@ export default {
 };
 </script>
 <style lang="less" scoped>
+.result-pending {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  color: var(--text-secondary);
+  overflow: hidden;
+}
+
+.result-pending-spinner {
+  width: 24px;
+  height: 24px;
+  margin-bottom: 8px;
+  border: 2px solid var(--border-primary);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+}
+
+.result-pending-message {
+  text-align: center;
+}
+
+.result-pending-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-right: 21px;
+}
+
+.result-pending-tab .loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e8e8e8;
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+}
+
 .cost-pop {
   flex-shrink: 0;
   color: #aaa;
@@ -1998,6 +2195,33 @@ export default {
   }
 
   overflow: hidden;
+
+  &--collapsed {
+    .result-info-container,
+    .result-content-wrapper {
+      display: none !important;
+    }
+  }
+
+  .result-collapse-toggle,
+  .result-maximize-toggle {
+    display: flex;
+    flex: 0 0 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid var(--border-primary);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 16px;
+
+    &:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: -2px;
+    }
+  }
 
   .tab-group {
     display: flex;
@@ -2394,6 +2618,25 @@ export default {
   z-index: 9;
 }
 
+.result-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.result-summary-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--link-color, #1b61c9);
+  font: inherit;
+  cursor: pointer;
+}
+
 .tip-footer-main {
   flex: 1;
   min-width: 0;
@@ -2402,56 +2645,6 @@ export default {
   gap: 8px;
   overflow: hidden;
   height: 30px;
-}
-
-.mongo-result-view-switch {
-  flex-shrink: 0;
-  margin-right: 8px;
-}
-
-.mongo-json-result-container {
-  overflow: auto;
-  padding: 8px;
-  background: #fafafa;
-}
-
-.mongo-json-empty {
-  padding: 24px;
-  text-align: center;
-  color: #999;
-}
-
-.mongo-json-doc {
-  margin-bottom: 12px;
-  border: 1px solid #e8e8e8;
-  border-radius: 4px;
-  background: #fff;
-}
-
-.mongo-json-doc-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 10px;
-  font-size: 12px;
-  color: #666;
-  border-bottom: 1px solid #f0f0f0;
-  background: #f5f5f5;
-}
-
-.mongo-json-copy {
-  cursor: pointer;
-  padding: 2px 4px;
-}
-
-.mongo-json-doc-body {
-  margin: 0;
-  padding: 10px 12px;
-  font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 .tip-footer-page {
@@ -2469,20 +2662,41 @@ export default {
 }
 
 .tip-footer-sql-pop {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 400px;
-  overflow: hidden;
+  flex-shrink: 0;
+  cursor: help;
 }
 
-.tip-footer-sql {
-  display: inline-block;
-  max-width: 100%;
-  padding-right: 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: middle;
+.query-rewrite-details {
+  width: 560px;
+  max-width: calc(100vw - 64px);
+  max-height: ~'min(240px, 35vh)';
+  overflow: auto;
+  white-space: normal;
+}
+
+.query-rewrite-section + .query-rewrite-section {
+  margin-top: 16px;
+}
+
+.query-rewrite-label {
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.query-rewrite-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.query-rewrite-sql {
+  margin: 0;
+  font-family: Menlo, Monaco, 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .tip-footer-right {
@@ -2522,6 +2736,33 @@ export default {
   align-items: center;
   gap: 4px;
   cursor: pointer;
+  white-space: nowrap;
+}
+
+.tip-footer-transpose-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0 4px;
+  border-radius: 6px;
+
+  &--active {
+    color: var(--primary-color);
+  }
+}
+
+.transposed-field-cell {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  font-weight: 500;
+  background: var(--bg-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

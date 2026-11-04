@@ -1,18 +1,48 @@
 {
-  "yuque": ["Yuque"],
-  "gaussDB": ["GaussDB"],
-  "paimon": ["Paimon"],
-  "pulsar": ["Pulsar"],
-  "polarDbX": ["PolarDbX"],
-  "mariaDb": ["MariaDB"],
-  "hudi": ["Hudi"],
-  "schemaMapping": ["Db2"],
-  "tunnel": ["Tunnel"],
-  "db2": ["Db2"],
-  "gp": ["Greenplum"],
-  "cloudberry": ["Cloudberry"],
-  "mysql": ["MySQL", "GaussDBForMySQL", "AuroraMySQL"],
-  "polar": ["PolarDbMySQL"],
+  "yuque": [
+    "Yuque"
+  ],
+  "gaussDB": [
+    "GaussDB"
+  ],
+  "paimon": [
+    "Paimon"
+  ],
+  "pulsar": [
+    "Pulsar"
+  ],
+  "polarDbX": [
+    "PolarDbX"
+  ],
+  "mariaDb": [
+    "MariaDB"
+  ],
+  "hudi": [
+    "Hudi"
+  ],
+  "schemaMapping": [
+    "Db2"
+  ],
+  "tunnel": [
+    "Tunnel"
+  ],
+  "db2": [
+    "Db2"
+  ],
+  "gp": [
+    "Greenplum"
+  ],
+  "cloudberry": [
+    "Cloudberry"
+  ],
+  "mysql": [
+    "MySQL",
+    "GaussDBForMySQL",
+    "AuroraMySQL"
+  ],
+  "polar": [
+    "PolarDbMySQL"
+  ],
   "pg": [
     "Hana",
     "Hudi",
@@ -34,12 +64,27 @@
     "Yuque",
     "KingbaseES"
   ],
-  "duckDB": ["DuckDB"],
-  "dynamoDB": ["DynamoDB"],
-  "sqlServer": ["SQLServer"],
-  "oracle": ["Oracle"],
-  "hana": ["Hana"],
-  "googleDrive": ["GoogleDrive"],
+  "duckDB": [
+    "DuckDB"
+  ],
+  "dynamoDB": [
+    "DynamoDB"
+  ],
+  "sqlServer": [
+    "SQLServer"
+  ],
+  "oracle": [
+    "Oracle",
+    "GoldenDBOracle",
+    "KingbaseESOracle",
+    "YashanDBOracle"
+  ],
+  "hana": [
+    "Hana"
+  ],
+  "googleDrive": [
+    "GoogleDrive"
+  ],
   "hasSchema": [
     "Tunnel",
     "Hudi",
@@ -77,30 +122,99 @@
     "Pulsar",
     "RagApi",
     "DynamoDB",
-    "AmazonMSK"
+    "AmazonMSK",
+    "Etcd"
   ],
   "columnMapping": {
     "clougence_cloudcanal_filter_after_mapping_column": "仅订阅不写入对端"
   },
-  "mq": ["Kafka", "RocketMQ", "RabbitMQ", "AutoMQ", "Pulsar", "AmazonMSK"],
-  "es": ["ElasticSearch"],
-  "hive": ["Hive"],
-  "rabbitMq": ["RabbitMQ"],
-  "rocketMq": ["RocketMQ"],
-  "needAkSk": ["RocketMQ", "RabbitMQ"],
-  "kafka": ["Kafka", "AutoMQ", "AmazonMSK"],
-  "drds": ["DRDS", "PolarDbX"],
-  "noEditSource": ["ElasticSearch"],
-  "noEditTarget": ["Hive", "DynamoDB"],
-  "redis": ["Redis", "Valkey", "ElastiCache"],
-  "kudu": ["Kudu"],
-  "ob": ["OceanBase"],
-  "ck": ["ClickHouse"],
-  "starrocks": ["StarRocks", "Doris", "SelectDB"],
-  "mongo": ["MongoDB", "DocumentDB", "DynamoDB"],
-  "iceberg": ["Iceberg", "Paimon", "DeltaLake"],
-  "tidb": ["TiDB"],
-  "noDb": ["Kudu", "Kafka", "RocketMQ", "RabbitMQ", "AutoMQ", "Redis", "Valkey", "ElastiCache", "ElasticSearch", "Pulsar", "RagApi", "DynamoDB", "AmazonMSK"],
+  "mq": [
+    "Kafka",
+    "RocketMQ",
+    "RabbitMQ",
+    "AutoMQ",
+    "Pulsar",
+    "AmazonMSK"
+  ],
+  "es": [
+    "ElasticSearch"
+  ],
+  "hive": [
+    "Hive"
+  ],
+  "rabbitMq": [
+    "RabbitMQ"
+  ],
+  "rocketMq": [
+    "RocketMQ"
+  ],
+  "needAkSk": [
+    "RocketMQ",
+    "RabbitMQ"
+  ],
+  "kafka": [
+    "Kafka",
+    "AutoMQ",
+    "AmazonMSK"
+  ],
+  "drds": [
+    "DRDS",
+    "PolarDbX"
+  ],
+  "noEditSource": [
+    "ElasticSearch"
+  ],
+  "noEditTarget": [
+    "Hive",
+    "DynamoDB"
+  ],
+  "redis": [
+    "Redis",
+    "Valkey",
+    "ElastiCache"
+  ],
+  "kudu": [
+    "Kudu"
+  ],
+  "ob": [
+    "OceanBase"
+  ],
+  "ck": [
+    "ClickHouse"
+  ],
+  "starrocks": [
+    "StarRocks",
+    "Doris",
+    "SelectDB"
+  ],
+  "mongo": [
+    "MongoDB",
+    "DocumentDB",
+    "DynamoDB"
+  ],
+  "iceberg": [
+    "Iceberg",
+    "Paimon",
+    "DeltaLake"
+  ],
+  "tidb": [
+    "TiDB"
+  ],
+  "noDb": [
+    "Kudu",
+    "Kafka",
+    "RocketMQ",
+    "RabbitMQ",
+    "AutoMQ",
+    "Redis",
+    "Valkey",
+    "ElastiCache",
+    "ElasticSearch",
+    "Pulsar",
+    "RagApi",
+    "DynamoDB",
+    "AmazonMSK"
+  ],
   "noColumn": [
     "MongoDB",
     "DocumentDB",
@@ -118,16 +232,52 @@
     "RagApi",
     "DynamoDB"
   ],
-  "ddlFilter": ["MySQL", "GaussDBForMySQL", "AuroraMySQL", "PolarDbMySQL", "PostgreSQL", "PolarDBPg", "Oracle", "Dameng", "MariaDB"],
-  "grepTime": ["GreptimeDB"],
-  "tdEngine": ["TDengine"],
-  "dameng": ["Dameng"],
-  "File": ["OssFile", "S3File", "SshFile", "GoogleDrive", "Yuque"],
-  "RagApi": ["RagApi"],
-  "Bedrock": ["Bedrock"],
-  "amazonMsk": ["AmazonMSK"],
-  "deltaLake": ["DeltaLake"],
-  "maxCompute": ["MaxCompute"],
-  "tdsqlMysql": ["TdsqlMySQL"],
-  "tdsqlCMysql": ["TdsqlCMySQL"]
+  "ddlFilter": [
+    "MySQL",
+    "GaussDBForMySQL",
+    "AuroraMySQL",
+    "PolarDbMySQL",
+    "PostgreSQL",
+    "PolarDBPg",
+    "Oracle",
+    "Dameng",
+    "MariaDB"
+  ],
+  "grepTime": [
+    "GreptimeDB"
+  ],
+  "tdEngine": [
+    "TDengine"
+  ],
+  "dameng": [
+    "Dameng"
+  ],
+  "File": [
+    "OssFile",
+    "S3File",
+    "SshFile",
+    "GoogleDrive",
+    "Yuque"
+  ],
+  "RagApi": [
+    "RagApi"
+  ],
+  "Bedrock": [
+    "Bedrock"
+  ],
+  "amazonMsk": [
+    "AmazonMSK"
+  ],
+  "deltaLake": [
+    "DeltaLake"
+  ],
+  "maxCompute": [
+    "MaxCompute"
+  ],
+  "tdsqlMysql": [
+    "TdsqlMySQL"
+  ],
+  "tdsqlCMysql": [
+    "TdsqlCMySQL"
+  ]
 }

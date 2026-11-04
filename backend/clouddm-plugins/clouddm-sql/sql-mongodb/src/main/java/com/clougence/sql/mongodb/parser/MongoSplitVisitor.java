@@ -34,6 +34,16 @@ public class MongoSplitVisitor extends MongoParserBaseVisitor<SplitQueryType> {
     }
 
     @Override
+    public SplitQueryType visitReplicaSetFunction(MongoParser.ReplicaSetFunctionContext ctx) {
+        return SplitQueryType.METADATA;
+    }
+
+    @Override
+    public SplitQueryType visitShardingFunction(MongoParser.ShardingFunctionContext ctx) {
+        return SplitQueryType.METADATA;
+    }
+
+    @Override
     public SplitQueryType visitDbCreateCollection(MongoParser.DbCreateCollectionContext ctx) {
         return SplitQueryType.CREATE_TABLE;
     }

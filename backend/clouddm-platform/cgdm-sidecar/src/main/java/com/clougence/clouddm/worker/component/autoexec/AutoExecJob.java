@@ -21,13 +21,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.security.MessageDigest;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HexFormat;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -132,7 +126,12 @@ public class AutoExecJob implements Runnable {
 
             // create session
             try {
-                DataSourceConfig dsConfig = this.configRService.fetchDsConfig(this.job.getDsId(), sessionConfigOverrides(this.job.getContextDTO()));
+                // The catalog/schema chosen for the ticket only lives in SessionContextDTO. Databases such as
+                // PostgreSQL cannot switch database on an open connection, so the connection has to be opened
+                // against the target database. Mirrors sessionConfigOverrides on the console side.
+                Map<String, String> configOverrides = sessionConfigOverrides(this.job.getContextDTO());
+                DataSourceConfig dsConfig = configOverrides.isEmpty() ? this.configRService.fetchDsConfig(this.job.getDsId()) : this.configRService
+                    .fetchDsConfigWithOverrides(this.job.getDsId(), configOverrides);
                 this.sessionAgent = this.sessionManager.createSession(backgroundRM, dsConfig, this.job.getContextDTO());
                 String currentQueryId = this.sessionAgent.getCurrentQueryId();
                 sendMessage(AutoExecMessageDTO.createQueryIdMessage(this.job.getJobId(), currentQueryId), true);
@@ -257,6 +256,7 @@ public class AutoExecJob implements Runnable {
     //
 
     private JobResult jobWrap(Path taskPackageFile) {
+        // run() closes this session after terminal reporting; restoring auto-commit here is unnecessary.
         boolean transaction = job.isEnableTransactional();
         try {
             if (transaction) {
@@ -290,9 +290,15 @@ public class AutoExecJob implements Runnable {
             return JobResult.SUCCESS;
         } catch (Throwable e) {
             if (transaction) {
-                sessionAgent.rollback();
-                log.warn("transaction rollback");
-                sendMessage(AutoExecMessageDTO.transactionRollbackMessage(job.getJobId()), false);
+                try {
+                    sessionAgent.rollback();
+                    log.warn("transaction rollback");
+                    sendMessage(AutoExecMessageDTO.transactionRollbackMessage(job.getJobId()), false);
+                } catch (Exception rollbackError) {
+                    e.addSuppressed(rollbackError);
+                    log.error("auto execution job failed, jobId: " + job.getJobId(), e);
+                    return JobResult.FAILED;
+                }
             }
             if (pauseRequested.get()) {
                 return JobResult.PAUSED;
@@ -442,11 +448,17 @@ public class AutoExecJob implements Runnable {
         return this.workerIdentity;
     }
 
+    /**
+     * Turns the ticket's target catalog/schema into datasource config overrides so the session is opened
+     * against the database the ticket actually selected. Returns an empty map when no context is available,
+     * in which case the caller keeps the datasource defaults.
+     */
     private Map<String, String> sessionConfigOverrides(SessionContextDTO context) {
         Map<String, String> configOverrides = new HashMap<>();
         if (context == null) {
             return configOverrides;
         }
+
         if (StringUtils.isNotBlank(context.getRdbCatalog())) {
             configOverrides.put(DsConfigField.DEFAULT_DATABASE.getConfigName(), context.getRdbCatalog());
         }

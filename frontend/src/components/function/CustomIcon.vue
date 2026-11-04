@@ -22,16 +22,27 @@
 
 <script>
 import cloudberryIcon from '@/assets/datasource/cloudberry.svg';
+import cloudDmMark from '@/assets/logo-clouddm-mark.svg';
 import cockroachdbIcon from '@/assets/datasource/cockroachdb.svg';
+import etcdIcon from '@/assets/datasource/etcd.svg';
+import goldendbIcon from '@/assets/datasource/goldendb.png';
 import kafkaIcon from '@/assets/datasource/kafka.svg';
 import valkeyIcon from '@/assets/datasource/valkey.svg';
+import yashandbIcon from '@/assets/datasource/yashandb.svg';
 import { getPluginResourceUrl } from '@/utils/pluginResource';
 
+const goldenDBTypes = ['GoldenDB', 'GoldenDBMySQL', 'GoldenDBOracle'];
 const bundledIcons = {
   Cloudberry: cloudberryIcon,
   CockroachDB: cockroachdbIcon,
   Kafka: kafkaIcon,
-  Valkey: valkeyIcon
+  Etcd: etcdIcon,
+  GoldenDB: goldendbIcon,
+  GoldenDBMySQL: goldendbIcon,
+  GoldenDBOracle: goldendbIcon,
+  Valkey: valkeyIcon,
+  YashanDBOracle: yashandbIcon,
+  YashanDBMySQL: yashandbIcon
 };
 
 /**
@@ -98,15 +109,27 @@ export default {
       return this.$store && this.$store.state && this.$store.state.theme;
     },
     iconStyle() {
+      let width = this.size;
+      if (goldenDBTypes.includes(this.type)) {
+        width = '100%';
+      }
       return {
-        width: this.size,
+        width,
         height: this.size,
         color: this.disabled ? '#A8A8A8' : this.color,
         filter: this.disabled ? 'grayscale(100%)' : 'none'
       };
     },
     bundledIcon() {
-      return bundledIcons[this.type] || '';
+      if (this.iconName === 'Internal') {
+        return cloudDmMark;
+      }
+
+      let name = this.type;
+      if (name && name.startsWith('icon-v2-')) {
+        name = name.slice(8);
+      }
+      return bundledIcons[name] || '';
     },
     resourceUrl() {
       return this.resource ? getPluginResourceUrl(this.resource) : '';
@@ -128,9 +151,13 @@ export default {
       };
 
       if (this.resource || this.bundledIcon) {
-        style.width = this.size;
+        let width = this.size;
+        if (goldenDBTypes.includes(this.type)) {
+          width = `calc(${this.size} + ${this.size})`;
+        }
+        style.width = width;
         style.height = this.size;
-        style['min-width'] = this.size;
+        style['min-width'] = width;
         style['line-height'] = this.size;
       }
       return style;
@@ -143,7 +170,11 @@ export default {
         MySQL: this.instanceType !== 'ALIBABA_CLOUD_HOSTED' ? 'MySQL' : 'RDSforMySQL',
         PostgreSQL: this.instanceType !== 'ALIBABA_CLOUD_HOSTED' ? 'PostgreSQL' : 'RDSforPostgreSQL',
         Greenplum: this.instanceType !== 'ALIBABA_CLOUD_HOSTED' ? 'Greenplum' : 'ADBforPG',
-        SQLServer: this.instanceType === 'ALIBABA_CLOUD_HOSTED' ? 'SQLServerBlue' : 'SQLServer'
+        SQLServer: this.instanceType === 'ALIBABA_CLOUD_HOSTED' ? 'SQLServerBlue' : 'SQLServer',
+        KingbaseESPostgreSQL: 'KingbaseES',
+        KingbaseESMySQL: 'KingbaseES',
+        KingbaseESOracle: 'KingbaseES',
+        KingbaseESSQLServer: 'KingbaseES'
       };
 
       // Based on current theme

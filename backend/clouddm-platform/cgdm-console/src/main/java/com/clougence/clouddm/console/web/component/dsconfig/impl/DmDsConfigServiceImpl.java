@@ -138,6 +138,7 @@ public class DmDsConfigServiceImpl implements DmDsConfigService, UnifiedPostCons
 
             DsConfig config = new DsConfig();
             config.setFeatures(PluginManager.hasFeature(dsType));
+            config.setClassify(dsType.getClassify());
             config.setConstant(new DsConstantConfig());
             config.setCategories(new DsCategories());
             config.setMenus(new HashMap<>());
@@ -168,6 +169,8 @@ public class DmDsConfigServiceImpl implements DmDsConfigService, UnifiedPostCons
                 option.setDelimited(true);
                 option.setDefaultLimit(20);
                 constant.setQuickQueryMap(loadQuickQueryMap(cmdTemplate, option));
+            } else {
+                constant.setQuickQueryMap(Collections.emptyMap());
             }
             DsBrowseSpi browseSpi = PluginManager.findDsBrowseSpi(dsType);
             if (browseSpi != null) {
@@ -177,7 +180,7 @@ public class DmDsConfigServiceImpl implements DmDsConfigService, UnifiedPostCons
                 levels.add(0, DsMenuType.Env.getTypeName());
                 config.getCategories().setLevels(levels);
                 config.getCategories().setLeafExpand(browseSpi.getLeafExpand().stream().map(UmiTypes::getTypeName).collect(Collectors.toList()));
-                config.getCategories().setLeafGroup(loadLeaf(browseSpi.getLeafGroupMap()));
+                config.getCategories().setLeafGroup(loadLeaf(browseSpi.getLeafGroupMap(), browseSpi.getLeafLabels()));
 
                 constant.setLeftQualifier(browseSpi.getLeftQualifier());
                 constant.setRightQualifier(browseSpi.getRightQualifier());
@@ -277,10 +280,21 @@ public class DmDsConfigServiceImpl implements DmDsConfigService, UnifiedPostCons
         return result;
     }
 
-    private Map<String, List<DsLevelLeaf>> loadLeaf(Map<UmiTypes, List<UmiTypes>> map) {
+    private Map<String, List<DsLevelLeaf>> loadLeaf(Map<UmiTypes, List<UmiTypes>> map, Map<UmiTypes, String> labels) {
         Map<String, List<DsLevelLeaf>> result = new HashMap<>(map.size());
         for (UmiTypes umiTypes : map.keySet()) {
-            result.put(umiTypes.getTypeName(), loadLeaf(map.get(umiTypes)));
+            List<DsLevelLeaf> leaves = new ArrayList<>();
+            for (DsLevelLeaf leaf : loadLeaf(map.get(umiTypes))) {
+                String label = labels.get(UmiTypes.valueOfCode(leaf.getType()));
+                if (label == null) {
+                    leaves.add(leaf);
+                } else {
+                    DsLevelLeaf named = leaf.clone();
+                    named.setI18n(label);
+                    leaves.add(named);
+                }
+            }
+            result.put(umiTypes.getTypeName(), leaves);
         }
 
         return result;
@@ -309,7 +323,7 @@ public class DmDsConfigServiceImpl implements DmDsConfigService, UnifiedPostCons
 
         List<UmiTypes> curLevelsDef = new ArrayList<>();
         Map<UmiTypes, Object> curLevelsParam = new HashMap<>();
-        for (int i = 2; i < levels.size(); i++) {
+        for (int i = 2; i < levels.size() && i < levelsDef.size(); i++) {
             UmiTypes umiType = UmiTypes.valueOfCode(levelsDef.get(i));
             curLevelsParam.put(umiType, levels.get(i));
             curLevelsDef.add(umiType);

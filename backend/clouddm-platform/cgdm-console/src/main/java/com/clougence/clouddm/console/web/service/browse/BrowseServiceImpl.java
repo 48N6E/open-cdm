@@ -44,6 +44,7 @@ import com.clougence.clouddm.platform.plugin.PluginManager;
 import com.clougence.clouddm.sdk.execute.meta.DsElement;
 import com.clougence.clouddm.sdk.execute.session.rdb.RdbSupportSpi;
 import com.clougence.clouddm.sdk.model.env.EnvParamKeys;
+import com.clougence.schema.umi.special.mq.MqValue;
 import com.clougence.schema.umi.special.rdb.*;
 import com.clougence.schema.umi.struts.UmiTypes;
 import com.clougence.schema.umi.struts.Value;
@@ -278,6 +279,9 @@ public class BrowseServiceImpl implements BrowseService {
                 break;
             case Trigger:
                 mo = DmConvertUtils.convertToBrowseTriggerMo((RdbTrigger) value);
+                break;
+            case Topic:
+                mo = DmConvertUtils.convertToBrowseMqMO((MqValue) value);
                 break;
             case Key:
                 mo = DmConvertUtils.convertToBrowseKeyMo((RdbValue) value);

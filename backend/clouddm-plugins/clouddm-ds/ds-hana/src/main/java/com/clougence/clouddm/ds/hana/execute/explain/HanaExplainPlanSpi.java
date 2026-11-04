@@ -1,6 +1,17 @@
 /*
  * Copyright 2026 杭州开云集致科技有限公司
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.clougence.clouddm.ds.hana.execute.explain;
 
@@ -22,6 +33,42 @@ public class HanaExplainPlanSpi implements ExplainPlanSpi {
     @Override
     public ExplainPlan analyze(List<Result> results, List<BehaviorRelation> relations) {
         ExplainPlan plan = new ExplainPlan();
+        if (results != null) {
+            parseNativeNodes(plan, results);
+        }
+
+        if (!plan.getNodes().isEmpty()) {
+            // OUTPUT_SIZE describes this operator, not the statement's affected rows.
+            plan.setSource(ExplainPlanSource.NATIVE);
+            return plan;
+        }
+
+        if (relations == null) {
+            return plan;
+        }
+
+        for (BehaviorRelation relation : relations) {
+            if (relation == null || !AFFECTED_ROW_ACTIONS.contains(relation.getAction())) {
+                continue;
+            }
+            ExplainPlanNode node = new ExplainPlanNode();
+            node.setNodeId("statement-" + plan.getNodes().size());
+            node.setLogical(relation.getAction().name());
+            if (relation.getSubject() != null) {
+                node.setObjectPath(relation.getSubject().getObjectPath());
+            }
+            if (relation.getInsertRows() != null) {
+                node.setEstimatedRows(relation.getInsertRows().doubleValue());
+            }
+            plan.getNodes().add(node);
+        }
+        if (!plan.getNodes().isEmpty()) {
+            plan.setSource(ExplainPlanSource.STATEMENT);
+        }
+        return plan;
+    }
+
+    private static void parseNativeNodes(ExplainPlan plan, List<Result> results) {
         Map<String, List<String>> metas = new HashMap<>();
         for (Result result : results) {
             if (result instanceof ResultSetMeta meta) {
@@ -38,56 +85,24 @@ public class HanaExplainPlanSpi implements ExplainPlanSpi {
             }
             Map<String, Integer> indexes = indexes(columns);
             for (ResultSetRow row : resultSet.getRowSet()) {
+                String nodeId = value(row, indexes.get("operator_id"));
+                String operator = value(row, indexes.get("operator_name"));
+                if (nodeId == null || nodeId.isBlank() || operator == null || operator.isBlank()) {
+                    continue;
+                }
+
                 ExplainPlanNode node = new ExplainPlanNode();
-                node.setNodeId(value(row, indexes.get("operator_id")));
+                node.setNodeId(nodeId);
                 node.setParentNodeId(value(row, indexes.get("parent_operator_id")));
-                node.setLogical(value(row, indexes.get("operator_name")));
+                node.setLogical(operator);
                 node.setPhysical(value(row, indexes.get("execution_engine")));
                 node.setObjectPath(value(row, indexes.get("table_name")));
                 node.setEstimatedRows(number(value(row, indexes.get("output_size"))));
+                node.setEstimatedSubtreeCost(number(value(row, indexes.get("subtree_cost"))));
+                node.setDescription(value(row, indexes.get("operator_details")));
                 node.setProperties(properties(row, columns));
                 plan.getNodes().add(node);
             }
-        }
-        BehaviorRelation write = write(relations);
-        if (write != null) {
-            ExplainPlanNode target = plan.getNodes().isEmpty() ? new ExplainPlanNode() : plan.getNodes().get(0);
-            if (plan.getNodes().isEmpty()) {
-                target.setNodeId("0");
-                plan.getNodes().add(target);
-            }
-            target.setLogical(write.getAction().name());
-            if (write.getSubject() != null) {
-                target.setObjectPath(write.getSubject().getObjectPath());
-            }
-            if (write.getInsertRows() != null) {
-                target.setEstimatedRows(write.getInsertRows().doubleValue());
-            } else if (target.getEstimatedRows() == null || target.getEstimatedRows() == 0D) {
-                target.setEstimatedRows(plan.getNodes().stream().map(ExplainPlanNode::getEstimatedRows).filter(rows -> rows != null && rows > 0D).findFirst().orElse(null));
-            }
-        }
-        source(plan, results, relations);
-        return plan;
-    }
-
-    private static BehaviorRelation write(List<BehaviorRelation> relations) {
-        if (relations == null) {
-            return null;
-        }
-        return relations.stream().filter(relation -> {
-            return relation != null && AFFECTED_ROW_ACTIONS.contains(relation.getAction());
-        }).findFirst().orElse(null);
-    }
-
-    private static void source(ExplainPlan plan, List<Result> results, List<BehaviorRelation> relations) {
-        boolean nativePlan = results != null && !results.isEmpty();
-        boolean statement = relations != null && !relations.isEmpty();
-        if (nativePlan && statement) {
-            plan.setSource(ExplainPlanSource.MERGE);
-        } else if (nativePlan) {
-            plan.setSource(ExplainPlanSource.NATIVE);
-        } else if (statement) {
-            plan.setSource(ExplainPlanSource.STATEMENT);
         }
     }
 
@@ -120,7 +135,14 @@ public class HanaExplainPlanSpi implements ExplainPlanSpi {
 
     private static Double number(String value) {
         try {
-            return value == null ? null : Double.valueOf(value);
+            if (value == null) {
+                return null;
+            }
+            double number = Double.parseDouble(value);
+            if (!Double.isFinite(number) || number < 0D) {
+                return null;
+            }
+            return number;
         } catch (NumberFormatException ignored) {
             return null;
         }

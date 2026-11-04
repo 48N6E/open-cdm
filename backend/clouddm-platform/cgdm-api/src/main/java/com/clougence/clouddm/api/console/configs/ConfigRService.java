@@ -35,9 +35,13 @@ public interface ConfigRService {
 
     DataSourceConfig fetchDsConfig(long dsId);
 
-    DataSourceConfig fetchDsConfig(long dsId, Map<String, String> configOverrides);
+    /**
+     * Same as {@link #fetchDsConfig(long)} but applies datasource config overrides, so a worker can open the
+     * session against a database other than the datasource default.
+     */
+    DataSourceConfig fetchDsConfigWithOverrides(long dsId, Map<String, String> configOverrides);
 
-    List<ConfigData> fetchDsConfig(String instanceId, List<String> names);
+    List<ConfigData> fetchDsConfigByInstanceIdAndNames(String instanceId, List<String> names);
 
     ToolConfig fetchToolConfig(String toolName);
 

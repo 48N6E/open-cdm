@@ -10,12 +10,6 @@
             </div>
           </div>
           <div class="ticket-overview__actions">
-            <Button class="warning-btn" v-if="ticketDetail.canApproval" type="primary" @click="handleShowApprovalModal">
-              {{ $t('shen-pi') }}
-            </Button>
-            <Button type="primary" v-if="ticketDetail.canExecute" @click="handleShowAutoExecuteModal('CONFIRM')">
-              {{ $t('zhi-xing') }}
-            </Button>
             <Button type="primary" v-if="ticketDetail.pcUrl" @click="handleGoToTheApproval">
               {{ thirdPartyName[ticketDetail.approType] }}
             </Button>
@@ -63,7 +57,14 @@
                 <Icon type="ios-server-outline" />
                 {{ $t('db-shi-li-ku-ming') }}
               </span>
-              <Tooltip transfer :content="ticketDetail.targetInfo">
+              <Poptip
+                transfer
+                trigger="hover"
+                placement="top-start"
+                popper-class="description-popup"
+                :content="ticketDetail.targetInfo"
+                :disabled="!ticketDetail.targetInfo"
+              >
                 <span class="ticket-meta-item__value ticket-meta-item__database">
                   <DataSourceIcon
                     class="ticket-meta-item__database-icon"
@@ -81,7 +82,7 @@
                     </span>
                   </span>
                 </span>
-              </Tooltip>
+              </Poptip>
             </div>
             <div class="ticket-meta-item">
               <span class="ticket-meta-item__label ticket-meta-item__label--with-icon">
@@ -89,12 +90,7 @@
                 {{ $t('ticket-application-template') }}
               </span>
               <span class="ticket-meta-item__value">
-                <img
-                  v-if="['Internal', 'Inner'].includes(ticketDetail.approType)"
-                  class="ticket-meta-item__product-icon"
-                  src="/dm.ico"
-                  alt="CloudDM"
-                />
+                <img v-if="ticketDetail.approType === 'Internal'" class="ticket-meta-item__product-icon" :src="cloudDmMark" alt="CloudDM" />
                 <CustomIcon
                   v-else-if="ticketDetail.approType"
                   :type="`icon-v2-${ticketDetail.approType}`"
@@ -130,9 +126,16 @@
                 <Icon type="ios-document-outline" />
                 {{ $t('miao-shu') }}
               </span>
-              <Tooltip transfer :content="ticketDetail.description">
+              <Poptip
+                transfer
+                trigger="hover"
+                placement="top-start"
+                popper-class="description-popup"
+                :content="ticketDetail.description"
+                :disabled="!ticketDetail.description"
+              >
                 <span class="ticket-meta-item__description">{{ ticketDetail.description || '-' }}</span>
-              </Tooltip>
+              </Poptip>
             </div>
           </div>
           <div v-if="ticketDetail.ticketStatus === 'FAILED' && ticketDetail.statusMessage" class="ticket-overview__error">
@@ -151,18 +154,28 @@
                 <button
                   type="button"
                   :class="['ticket-progress-step', `ticket-progress-step--${step.state}`, { 'is-selected': selectedStepKey === step.key }]"
+                  :aria-current="step.state === 'active' ? 'step' : null"
+                  :aria-pressed="selectedStepKey === step.key"
                   @click="selectTicketStep(step)"
                 >
                   <span class="ticket-progress-step__icon"><Icon :type="step.icon" /></span>
                   <span class="ticket-progress-step__content">
                     <strong>{{ step.title }}</strong>
                     <span>{{ step.time || '-' }}</span>
-                    <span class="ticket-progress-step__handler">{{ $t('chu-li-ren') }}：{{ step.handler || '-' }}</span>
+                    <span v-if="step.stage === 'APPROVAL' || step.state === 'canceled'" class="ticket-progress-step__handler">
+                      {{ step.statusText }}
+                    </span>
+                    <span v-else class="ticket-progress-step__handler" :title="step.handler || '-'">
+                      {{ $t('chu-li-ren') }}：{{ step.handler || '-' }}
+                    </span>
                   </span>
                 </button>
                 <span
                   v-if="index < ticketProgressSteps.length - 1"
-                  :class="['ticket-progress-connector', { 'is-reached': ticketProgressSteps[index + 1].state !== 'pending' }]"
+                  :class="[
+                    'ticket-progress-connector',
+                    { 'is-reached': ['active', 'finished', 'failed'].includes(ticketProgressSteps[index + 1].state) }
+                  ]"
                 ></span>
               </template>
             </div>
@@ -177,8 +190,34 @@
               <strong class="ticket-step-name">{{ selectedTicketStep.title }}</strong>
             </div>
             <div class="ticket-step-summary__item">
-              <span>{{ $t('chu-li-ren') }}</span>
-              <strong>{{ selectedTicketStep.handler || '-' }}</strong>
+              <span>
+                {{ selectedTicketStep.stage === 'APPROVAL' && approvalProgressSteps.length ? $t('ticket-approval-progress') : $t('chu-li-ren') }}
+              </span>
+              <strong v-if="selectedTicketStep.stage === 'APPROVAL' && approvalProgressSteps.length">
+                {{ $t('ticket-approval-completed-stages', { completed: approvalCompletedCount, total: approvalProgressSteps.length }) }}
+              </strong>
+              <div v-else-if="selectedTicketStep.handlers.length" v-processor-overflow class="ticket-processors">
+                <img
+                  v-if="selectedTicketStep.handlers.length === 1 && selectedTicketStep.handlers[0] === 'CloudDM'"
+                  class="ticket-meta-item__product-icon"
+                  :src="cloudDmMark"
+                  alt="CloudDM"
+                />
+                <span class="ticket-processors__summary" :title="selectedTicketStep.handlers.join(', ')">
+                  {{ selectedTicketStep.handlers.join(', ') }}
+                </span>
+                <button
+                  type="button"
+                  class="ticket-processors__more"
+                  @click="
+                    processorActivityIndex = null;
+                    showProcessorsModal = true;
+                  "
+                >
+                  {{ $t('cha-kan-geng-duo') }}
+                </button>
+              </div>
+              <strong v-else>-</strong>
             </div>
             <div class="ticket-step-summary__item">
               <span>{{ $t('kai-shi-shi-jian') }}</span>
@@ -196,6 +235,211 @@
             </span>
             <strong>{{ $t('ticket-rejection-reason') }}</strong>
             <p>{{ selectedTicketRejectionReason }}</p>
+          </div>
+
+          <div v-if="approvalProgressSteps.length" class="ticket-approval-overview">
+            <ol class="analysis-summary-list ticket-approval-progress" :aria-label="$t('ticket-approval-progress')">
+              <li v-for="step in approvalProgressSteps" :key="step.key" :class="['ticket-approval-stage', `ticket-approval-stage--${step.state}`]">
+                <div class="analysis-summary-item ticket-approval-stage__details">
+                  <div
+                    class="analysis-summary-row ticket-approval-row"
+                    role="button"
+                    tabindex="0"
+                    :aria-current="step.state === 'active' ? 'step' : null"
+                    :aria-expanded="expandedApprovalStepKeys.includes(step.key)"
+                    :aria-controls="`approval-result-${step.key}`"
+                    @click="toggleApprovalStep(step.key)"
+                    @keydown.enter.prevent="toggleApprovalStep(step.key)"
+                    @keydown.space.prevent="toggleApprovalStep(step.key)"
+                  >
+                    <span
+                      :class="['analysis-summary-row__expand', { 'is-expanded': expandedApprovalStepKeys.includes(step.key) }]"
+                      aria-hidden="true"
+                    >
+                      <Icon type="ios-arrow-forward" />
+                    </span>
+                    <span class="analysis-summary-row__icon" aria-hidden="true">
+                      <Icon :type="step.approvalActivity?.approverType === participantTypes.PERSON ? 'ios-person-outline' : 'ios-people-outline'" />
+                    </span>
+                    <strong>{{ step.title }}</strong>
+                    <span :class="['analysis-item-status', `status-${step.statusClass}`]">{{ step.statusText }}</span>
+                    <span class="ticket-approval-row__rule">
+                      <template v-if="step.approvalActivity">
+                        {{
+                          $t('approval-task-count', {
+                            approved: step.approvalActivity.approvedCount,
+                            required: step.approvalActivity.requiredCount
+                          })
+                        }}
+                      </template>
+                      <template v-else>{{ $t('ticket-approval-any-person') }}</template>
+                    </span>
+                  </div>
+                  <div
+                    :id="`approval-result-${step.key}`"
+                    :class="['analysis-result-collapse', { 'is-expanded': expandedApprovalStepKeys.includes(step.key) }]"
+                    :aria-hidden="!expandedApprovalStepKeys.includes(step.key)"
+                    :inert="!expandedApprovalStepKeys.includes(step.key)"
+                  >
+                    <div class="analysis-result-collapse__content">
+                      <div class="analysis-result-details analysis-result-details--table ticket-approval-table">
+                        <Table :columns="approvalTaskColumns" :data="step.approvalTasks" :scroll="{ x: 786 }" border size="small">
+                          <template #result="{ row }">
+                            <span
+                              v-if="row.status"
+                              :class="[
+                                'analysis-item-status',
+                                {
+                                  'status-finished': row.status === approvalTaskStatuses.APPROVED,
+                                  'status-failed': row.status === approvalTaskStatuses.REJECTED,
+                                  'status-active': row.status === approvalTaskStatuses.PENDING,
+                                  'status-init': [approvalTaskStatuses.WAITING, approvalTaskStatuses.CANCELED].includes(row.status)
+                                }
+                              ]"
+                            >
+                              {{ $t(`approval-task-${row.status}`) }}
+                            </span>
+                            <span v-else>-</span>
+                          </template>
+                          <template #approvalTime="{ row }">
+                            <span v-if="[approvalTaskStatuses.APPROVED, approvalTaskStatuses.REJECTED].includes(row.status) && row.finishTime">
+                              {{ formatTime(row.finishTime, 'YYYY-MM-DD HH:mm:ss') }}
+                            </span>
+                            <span v-else>-</span>
+                          </template>
+                          <template #comment="{ row }">
+                            <span class="ticket-approval-comment">{{ row.comment || '-' }}</span>
+                          </template>
+                          <template #approvalAction="{ row }">
+                            <Button
+                              v-if="canApproveTask(step, row)"
+                              class="ticket-approval-action"
+                              type="primary"
+                              size="small"
+                              @click="handleShowApprovalModal(step.approvalActivity?.processActivityId)"
+                            >
+                              {{ $t('shen-pi') }}
+                            </Button>
+                            <span v-else>-</span>
+                          </template>
+                        </Table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            </ol>
+          </div>
+
+          <div
+            v-if="['CONFIRM', 'EXECUTION'].includes(selectedTicketStep.stage) && ticketDetail.canExecute"
+            class="analysis-summary-list ticket-execute-config"
+          >
+            <div class="analysis-summary-item">
+              <div
+                class="analysis-summary-row"
+                role="button"
+                tabindex="0"
+                :aria-expanded="executionConfigExpanded"
+                aria-controls="ticket-execute-config-content"
+                @click="executionConfigExpanded = !executionConfigExpanded"
+                @keydown.enter.prevent="executionConfigExpanded = !executionConfigExpanded"
+                @keydown.space.prevent="executionConfigExpanded = !executionConfigExpanded"
+              >
+                <span :class="['analysis-summary-row__expand', { 'is-expanded': executionConfigExpanded }]" aria-hidden="true">
+                  <Icon type="ios-arrow-forward" />
+                </span>
+                <span class="analysis-summary-row__icon" aria-hidden="true"><Icon type="ios-play-outline" /></span>
+                <strong>{{ $t('gong-dan-zhi-xing') }}</strong>
+                <span :class="['analysis-item-status', `status-${selectedTicketStep.statusClass}`]">{{ selectedTicketStep.statusText }}</span>
+                <span class="analysis-summary-row__result">{{ executionModeText }}</span>
+              </div>
+              <div
+                id="ticket-execute-config-content"
+                :class="['analysis-result-collapse', { 'is-expanded': executionConfigExpanded }]"
+                :aria-hidden="!executionConfigExpanded"
+                :inert="!executionConfigExpanded"
+              >
+                <div class="analysis-result-collapse__content">
+                  <div class="analysis-result-details">
+                    <Form class="ticket-execute-form" :model="confirmInfo.autoExecConfig" label-position="top">
+                      <FormItem :label="$t('ticket-execution-method')" prop="autoExecType">
+                        <RadioGroup class="ticket-execute-mode-options" v-model="confirmInfo.autoExecConfig.autoExecType">
+                          <Radio label="MANUAL_EXEC">{{ $t('yi-shou-dong-wan-cheng') }}</Radio>
+                          <Radio label="IMMEDIATE">{{ $t('li-ji-zhi-xing') }}</Radio>
+                          <Radio label="SPECIFY_TIME">{{ $t('ding-shi-zhi-xing') }}</Radio>
+                        </RadioGroup>
+                      </FormItem>
+                      <FormItem v-if="confirmInfo.autoExecConfig.autoExecType === 'SPECIFY_TIME'" :label="$t('zhi-hang-shi-jian')">
+                        <a-date-picker
+                          class="ticket-execute-schedule"
+                          v-model:value="confirmInfo.autoExecConfig.execTime"
+                          show-time
+                          format="YYYY-MM-DD HH:mm:ss"
+                          :placeholder="$t('qing-xuan-ze-zhi-hang-shi-jian')"
+                        />
+                      </FormItem>
+                      <FormItem
+                        prop="enableTransactional"
+                        v-if="
+                          confirmInfo.autoExecConfig.autoExecType !== 'MANUAL_EXEC' &&
+                          !isCk(ticketDetail.dataSourceType) &&
+                          !isMongoDB(ticketDetail.dataSourceType)
+                        "
+                      >
+                        <template #label>
+                          <span class="ticket-transaction-label">
+                            {{ $t('shi-wu') }}
+                            <Poptip
+                              trigger="hover"
+                              transfer
+                              popper-class="description-popup"
+                              :content="$t('ru-guo-sql-yu-ju-zhong-cun-zai-fei-dml-yu-ju-ke-neng-hui-bei-fen-wei-duo-ge-shi-wu-zhi-hang')"
+                            >
+                              <Icon type="ios-help-circle-outline" :size="16" role="img" :aria-label="$t('shuo-ming')" />
+                            </Poptip>
+                          </span>
+                        </template>
+                        <RadioGroup
+                          class="ticket-execute-mode-options"
+                          :model-value="Number(confirmInfo.autoExecConfig.enableTransactional)"
+                          @on-change="confirmInfo.autoExecConfig.enableTransactional = $event === 1"
+                        >
+                          <Radio :label="1">{{ $t('kai-qi-0') }}</Radio>
+                          <Radio :label="0">{{ $t('guan-bi') }}</Radio>
+                        </RadioGroup>
+                      </FormItem>
+                      <FormItem :label="$t('bei-zhu')">
+                        <a-textarea class="ticket-execute-comment" v-model:value="confirmInfo.comment" :rows="3" />
+                      </FormItem>
+                    </Form>
+                    <div class="ticket-execute-config__actions">
+                      <Button
+                        type="primary"
+                        :loading="confirmSubmitting"
+                        :disabled="confirmSubmitting"
+                        @click="handleFinishTicket"
+                        v-if="confirmInfo.autoExecConfig.autoExecType === 'MANUAL_EXEC'"
+                      >
+                        {{ $t('ticket-execution-confirm') }}
+                      </Button>
+                      <Button type="primary" :loading="confirmSubmitting" :disabled="confirmSubmitting" @click="handleConfirmTicket" v-else>
+                        {{ $t('ticket-execution-confirm') }}
+                      </Button>
+                      <Button
+                        :disabled="confirmSubmitting"
+                        @click="
+                          resetExecutionConfig();
+                          executionConfigExpanded = false;
+                        "
+                      >
+                        {{ $t('qu-xiao') }}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <template v-if="selectedTicketStep.stage === 'EXPLAIN' && analysisItems.length">
@@ -341,14 +585,14 @@
           <template v-else-if="selectedTicketStep.stage === 'EXECUTION' && autoExec && ['DM_QUERY', 'DM_CHANGE'].includes(ticketType)">
             <div class="ticket-execution-detail">
               <div :class="['analysis-summary-item', 'ticket-execution-card', { 'is-expanded': taskExecutionExpanded }]">
-                <div class="analysis-summary-row ticket-execution-summary-row">
+                <div class="analysis-summary-row ticket-execution-summary-row" @click="taskExecutionExpanded = !taskExecutionExpanded">
                   <button
                     type="button"
                     :class="['analysis-summary-row__expand', { 'is-expanded': taskExecutionExpanded }]"
                     :aria-label="taskExecutionExpanded ? $t('ticket-collapse-details') : $t('ticket-expand-details')"
                     :aria-expanded="taskExecutionExpanded"
                     aria-controls="ticket-execution-result"
-                    @click="taskExecutionExpanded = !taskExecutionExpanded"
+                    @click.stop="taskExecutionExpanded = !taskExecutionExpanded"
                   >
                     <Icon type="ios-arrow-forward" />
                   </button>
@@ -369,7 +613,7 @@
                     <span v-if="autoExecJobInfo.workerIp">{{ $t('ji-qi-ip-0') }} {{ autoExecJobInfo.workerIp }}</span>
                     <span v-if="autoExecJobInfo.workerStatus">{{ $t('ji-qi-zhuang-tai-0') }} {{ autoExecJobInfo.workerStatus }}</span>
                   </div>
-                  <div class="ticket-execution-actions">
+                  <div class="ticket-execution-actions" @click.stop>
                     <Button v-if="autoExecJobInfo.canEnd" type="text" size="small" @click="handleShowEndAutoExecJobModal">
                       {{ $t('ticket-execution-action-terminate') }}
                     </Button>
@@ -400,7 +644,7 @@
                   :inert="!taskExecutionExpanded"
                 >
                   <div class="analysis-result-collapse__content">
-                    <div class="analysis-result-details ticket-execution-body">
+                    <div class="analysis-result-details analysis-result-details--table">
                       <div class="ticket-execution-table">
                         <Table :columns="autoExecTaskColumns" :data="autoExecTaskList" border size="small">
                           <template #status="{ row }">
@@ -434,19 +678,41 @@
             </div>
           </template>
 
-          <div v-else-if="selectedTicketStep.activities.length" class="ticket-activity-list">
+          <div
+            v-else-if="
+              selectedTicketStep.activities.length &&
+              !approvalProgressSteps.length &&
+              !(['CONFIRM', 'EXECUTION'].includes(selectedTicketStep.stage) && ticketDetail.canExecute)
+            "
+            class="ticket-activity-list"
+          >
             <div
               class="ticket-activity-row"
-              v-for="activity in selectedTicketStep.activities"
+              v-for="(activity, activityIndex) in selectedTicketStep.activities"
               :key="activity.processActivityId || activity.activityTitle"
             >
               <div>
-                <span>{{ $t('shen-pi-jie-dian') }}</span>
+                <span>{{ $t('approval-stages') }}</span>
                 <strong>{{ activity.activityTitle }}</strong>
               </div>
               <div>
                 <span>{{ $t('chu-li-ren') }}</span>
-                <strong>{{ activity.approvalUserList && activity.approvalUserList.length ? activity.approvalUserList.join(', ') : '-' }}</strong>
+                <div v-if="activity.approvalUserList?.length" v-processor-overflow class="ticket-processors">
+                  <span class="ticket-processors__summary" :title="activity.approvalUserList.join(', ')">
+                    {{ activity.approvalUserList.join(', ') }}
+                  </span>
+                  <button
+                    type="button"
+                    class="ticket-processors__more"
+                    @click="
+                      processorActivityIndex = activityIndex;
+                      showProcessorsModal = true;
+                    "
+                  >
+                    {{ $t('cha-kan-geng-duo') }}
+                  </button>
+                </div>
+                <strong v-else>-</strong>
               </div>
               <div>
                 <span>{{ $t('wan-cheng-shi-jian') }}</span>
@@ -536,8 +802,16 @@
         </div>
       </section>
     </div>
+    <CCModal v-model="showProcessorsModal" :title="$t('chu-li-ren')" :width="480">
+      <ul class="ticket-processors__list">
+        <li v-for="(name, index) in processorNames" :key="index" class="ticket-processors__person" :title="name">{{ name }}</li>
+      </ul>
+      <template #footer>
+        <Button @click="showProcessorsModal = false">{{ $t('guan-bi') }}</Button>
+      </template>
+    </CCModal>
     <CCModal v-model="showApprovalModal" :title="$t('shen-pi')" :closable="false">
-      <Form>
+      <Form class="ticket-approval-form">
         <FormItem :label="$t('yi-jian')">
           <RadioGroup v-model="approvalData.rejected">
             <Radio label="false">{{ $t('tong-yi') }}</Radio>
@@ -596,61 +870,6 @@
         <Button @click="handleCloseModal">{{ $t('qu-xiao') }}</Button>
       </template>
     </CCModal>
-    <CCModal :title="$t('gong-dan-zhi-xing')" v-model="showAutoExecuteModal" width="800px">
-      <Form class="ticket-execute-form" :model="confirmInfo.autoExecConfig" label-position="top">
-        <FormItem :label="$t('zhi-hang-ce-lve')" prop="autoExecType">
-          <RadioGroup class="ticket-execute-mode-options" v-model="confirmInfo.autoExecConfig.autoExecType">
-            <Radio label="MANUAL_EXEC">{{ $t('yi-shou-dong-wan-cheng') }}</Radio>
-            <Radio label="IMMEDIATE">{{ $t('li-ji-zhi-xing') }}</Radio>
-            <Radio label="SPECIFY_TIME">{{ $t('ding-shi-zhi-xing') }}</Radio>
-          </RadioGroup>
-          <div v-if="confirmInfo.autoExecConfig.autoExecType === 'SPECIFY_TIME'" class="ticket-execute-schedule-row">
-            <span class="ticket-execute-schedule-label">{{ $t('zhi-hang-shi-jian') }}</span>
-            <DatePicker
-              class="ticket-execute-schedule"
-              v-model="confirmInfo.autoExecConfig.execTime"
-              type="datetime"
-              :placeholder="$t('qing-xuan-ze-zhi-hang-shi-jian')"
-            />
-          </div>
-        </FormItem>
-        <FormItem
-          :label="$t('shi-wu')"
-          prop="enableTransactional"
-          v-if="!isCk(ticketDetail.dataSourceType) && !isMongoDB(ticketDetail.dataSourceType)"
-        >
-          <div class="ticket-execute-transaction">
-            <i-switch
-              v-model="confirmInfo.autoExecConfig.enableTransactional"
-              size="large"
-              :disabled="confirmInfo.autoExecConfig.autoExecType === 'MANUAL_EXEC'"
-            >
-              <template #open>{{ $t('kai-qi-0') }}</template>
-              <template #close>{{ $t('guan-bi') }}</template>
-            </i-switch>
-            <span>{{ $t('ru-guo-sql-yu-ju-zhong-cun-zai-fei-dml-yu-ju-ke-neng-hui-bei-fen-wei-duo-ge-shi-wu-zhi-hang') }}</span>
-          </div>
-        </FormItem>
-        <FormItem :label="$t('bei-zhu')">
-          <a-textarea class="ticket-execute-comment" v-model:value="confirmInfo.comment" :rows="3" />
-        </FormItem>
-      </Form>
-      <template #footer>
-        <Button
-          type="primary"
-          :loading="confirmSubmitting"
-          :disabled="confirmSubmitting"
-          @click="handleFinishTicket"
-          v-if="confirmInfo.autoExecConfig.autoExecType === 'MANUAL_EXEC'"
-        >
-          {{ $t('jie-shu-gong-dan') }}
-        </Button>
-        <Button type="primary" :loading="confirmSubmitting" :disabled="confirmSubmitting" @click="handleConfirmTicket" v-else>
-          {{ confirmInfo.autoExecConfig.autoExecType == 'IMMEDIATE' ? $t('li-ji-zhi-hang') : $t('ding-shi-zhi-hang') }}
-        </Button>
-        <Button @click="handleCloseModal">{{ $t('qu-xiao') }}</Button>
-      </template>
-    </CCModal>
     <CCModal v-model="showAutoExecJobLogModal" :title="$t('ticket-execution-scheduling-log')" @ok="handleCloseModal" :width="800">
       <Table :columns="autoExecJobLogColumns" :data="autoExecJobLogList" border size="small" />
     </CCModal>
@@ -698,11 +917,14 @@
 
 <script>
 import appLogger from '@/utils/logger';
+import dayjs from '@/utils/dayjsSetup';
 import { mapState } from 'vuex';
+import cloudDmMark from '@/assets/logo-clouddm-mark.svg';
 import { TICKET_PROCESS_STATUS } from '@/const';
+import { APPROVAL_PARTICIPANT_TYPES, APPROVAL_TASK_STATUSES } from '@/views/system/approval/constant';
 import ReadOnlyEditor from '@/components/editor/ReadOnlyEditor';
 import copyMixin from '@/mixins/copyMixin';
-import { isCk, isMongoDB, RULE_WARN_LEVEL } from '@/utils';
+import { formatTime, isCk, isMongoDB, RULE_WARN_LEVEL } from '@/utils';
 
 const TICKET_AUTO_REFRESH_INTERVAL_MS = 5000;
 const TICKET_TERMINAL_STATUSES = new Set(['REJECTED', 'FINISHED', 'CLOSED', 'CANCELED', 'FAILED']);
@@ -771,14 +993,42 @@ const AUTO_EXEC_TASK_STATUS_I18N_KEYS = {
   CANCELED: 'ticket-execution-canceled'
 };
 
+const processorOverflowObservers = new WeakMap();
+const processorOverflow = {
+  mounted(el) {
+    const update = () => {
+      const summary = el.querySelector('.ticket-processors__summary');
+      // Compare against the full row so the button itself cannot keep the row overflowing.
+      el.classList.toggle('ticket-processors--overflow', summary.scrollWidth > el.clientWidth);
+    };
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    processorOverflowObservers.set(el, { observer, update });
+    update();
+  },
+  updated(el) {
+    processorOverflowObservers.get(el).update();
+  },
+  beforeUnmount(el) {
+    processorOverflowObservers.get(el).observer.disconnect();
+    processorOverflowObservers.delete(el);
+  }
+};
+
 export default {
   name: 'TicketDetail',
+  directives: { processorOverflow },
   components: {
     ReadOnlyEditor
   },
   mixins: [copyMixin],
   data() {
     return {
+      participantTypes: APPROVAL_PARTICIPANT_TYPES,
+      approvalTaskStatuses: APPROVAL_TASK_STATUSES,
+      cloudDmMark,
+      showProcessorsModal: false,
+      processorActivityIndex: null,
       autoExec: false,
       RULE_WARN_LEVEL,
       noPassedRuleList: [],
@@ -910,7 +1160,7 @@ export default {
       total: 0,
       showCloseTicketModal: false,
       activeSqlTab: 'raw',
-      showAutoExecuteModal: false,
+      executionConfigExpanded: true,
       showManualExecuteModal: false,
       showRollbackSqlModal: false,
       showTicketContentModal: false,
@@ -934,6 +1184,7 @@ export default {
       ticketAutoRefreshActive: false,
       ticketAutoRefreshTimer: null,
       analysisResultsExpanded: false,
+      expandedApprovalStepKeys: [],
       taskExecutionExpanded: true,
       durationNow: Date.now(),
       durationTimer: null,
@@ -988,6 +1239,7 @@ export default {
           time: this.ticketDetail.gmtCreate,
           startTime: this.ticketDetail.gmtCreate,
           handler: this.ticketDetail.userName,
+          handlers: this.ticketDetail.userName ? [this.ticketDetail.userName] : [],
           statusText: this.TICKET_PROCESS_STATUS.FINISH,
           statusClass: 'finished',
           state: 'finished',
@@ -998,39 +1250,53 @@ export default {
       ];
       const processes = this.ticketDetail.ticketProcessVOList || [];
       let activeFound = TICKET_TERMINAL_STATUSES.has(this.ticketDetail.ticketStatus);
+      let flowStopped = false;
       processes.forEach((process) => {
         let state = 'pending';
         let icon = 'md-time';
-        if (process.ticketProcessStatus === 'FINISH') {
+        if (flowStopped || process.ticketProcessStatus === 'CLOSED') {
+          state = 'canceled';
+          icon = 'md-remove';
+          flowStopped = true;
+        } else if (process.ticketProcessStatus === 'FINISH') {
           state = 'finished';
           icon = 'md-checkmark';
-        } else if (['REJECT', 'FAIL', 'CLOSED'].includes(process.ticketProcessStatus)) {
+        } else if (['REJECT', 'FAIL'].includes(process.ticketProcessStatus)) {
           state = 'failed';
           icon = 'md-close';
           activeFound = true;
+          flowStopped = true;
         } else if (!activeFound) {
           state = 'active';
           icon = 'md-time';
           activeFound = true;
         }
+
         let statusText = this.TICKET_PROCESS_STATUS[process.ticketProcessStatus] || '-';
-        if (process.ticketStage === 'EXPLAIN' && state !== 'finished') {
+        if (state === 'canceled') {
+          statusText = this.$t('yi-guan-bi');
+        } else if (process.ticketStage === 'EXPLAIN' && state !== 'finished') {
           statusText = this.analysisProcessStatusText;
         }
+
         if (state === 'active' && process.ticketStage === 'APPROVAL') {
           statusText = this.$t('deng-dai-shen-pi');
         }
+
         let startTime = process.gmtCreate;
         const activityStartTimes = (process.activityList || []).map((activity) => activity.startTime).filter(Boolean);
         if (activityStartTimes.length) {
           startTime = activityStartTimes[0];
         }
+
+        const unhandled = ['pending', 'canceled'].includes(state);
         steps.push({
           key: String(process.ticketProcessId),
           title: process.ticketStageTitle,
-          time: process.finishTime || startTime,
-          startTime,
-          handler: state === 'pending' ? '' : process.execUserName,
+          time: state === 'canceled' ? '' : process.finishTime || startTime,
+          startTime: state === 'canceled' ? '' : startTime,
+          handler: unhandled ? '' : process.execUserName,
+          handlers: unhandled ? [] : process.execUserNameList || [],
           statusText,
           statusClass: state === 'pending' ? 'init' : state,
           state,
@@ -1042,11 +1308,71 @@ export default {
       });
       return steps;
     },
+    approvalProgressSteps() {
+      if (this.selectedTicketStep.stage !== 'APPROVAL' || this.ticketDetail.approType !== 'Internal') {
+        return [];
+      }
+
+      const process = this.selectedTicketStep.process;
+      if (process.activityList?.some((activity) => activity.approvalTasks?.length)) {
+        return this.buildApprovalProgressSteps(process);
+      }
+
+      const statusMap = { FINISH: APPROVAL_TASK_STATUSES.APPROVED, REJECT: APPROVAL_TASK_STATUSES.REJECTED };
+      const status = statusMap[process.ticketProcessStatus];
+      return [
+        {
+          ...this.selectedTicketStep,
+          title: this.$t('ticket-approval-team-unrecorded'),
+          approvalTasks: this.selectedTicketStep.handlers.map((approverName) => ({
+            approverName,
+            status,
+            finishTime: status ? process.finishTime : null,
+            comment: status ? this.ticketDetail.approComment : ''
+          }))
+        }
+      ];
+    },
+    activeApprovalStepKey() {
+      return this.approvalProgressSteps.find((step) => step.state === 'active')?.key || '';
+    },
+    approvalTaskColumns() {
+      return [
+        { title: this.$t('ticket-approval-approver'), key: 'approverName', minWidth: 140 },
+        { title: this.$t('ticket-approval-result'), slot: 'result', minWidth: 120 },
+        { title: this.$t('ticket-approval-time'), slot: 'approvalTime', width: 190 },
+        { title: this.$t('yi-jian'), slot: 'comment', minWidth: 240 },
+        { title: this.$t('cao-zuo'), slot: 'approvalAction', width: 96 }
+      ];
+    },
+    approvalCompletedCount() {
+      return this.approvalProgressSteps.filter((step) => step.state === 'finished').length;
+    },
+    processorNames() {
+      if (this.processorActivityIndex !== null) {
+        return this.selectedTicketStep?.activities[this.processorActivityIndex]?.approvalUserList || [];
+      }
+      return this.selectedTicketStep?.handlers || [];
+    },
+    executionModeText() {
+      const mode = this.confirmInfo.autoExecConfig.autoExecType;
+      if (mode === 'MANUAL_EXEC') {
+        return this.$t('yi-shou-dong-wan-cheng');
+      }
+      if (mode === 'SPECIFY_TIME') {
+        return this.$t('ding-shi-zhi-xing');
+      }
+      return this.$t('li-ji-zhi-xing');
+    },
     selectedTicketStep() {
       return this.ticketProgressSteps.find((step) => step.key === this.selectedStepKey) || this.ticketProgressSteps[0];
     },
     selectedTicketRejectionReason() {
-      if (this.selectedTicketStep?.stage !== 'APPROVAL' || this.selectedTicketStep.process?.ticketProcessStatus !== 'REJECT') {
+      if (
+        this.approvalProgressSteps.length ||
+        this.selectedTicketStep?.stage !== 'APPROVAL' ||
+        this.selectedTicketStep.process?.ticketProcessStatus !== 'REJECT'
+      ) {
         return '';
       }
       return this.ticketDetail.approComment?.trim() || '';
@@ -1134,6 +1460,24 @@ export default {
     }
   },
   watch: {
+    'ticketDetail.canExecute'(canExecute) {
+      if (canExecute) {
+        this.resetExecutionConfig();
+        this.executionConfigExpanded = true;
+      }
+    },
+    activeApprovalStepKey: {
+      immediate: true,
+      handler(key) {
+        this.expandedApprovalStepKeys = key ? [key] : [];
+      }
+    },
+    selectedStepKey() {
+      this.showProcessorsModal = false;
+      this.$nextTick(() => {
+        this.$el.querySelector('.ticket-progress-step.is-selected')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      });
+    },
     analysisItems(items) {
       if (!items.some((item) => item.activityTitle === this.analysisResultTab)) {
         this.analysisResultTab = items[0]?.activityTitle || '';
@@ -1141,6 +1485,7 @@ export default {
     }
   },
   methods: {
+    formatTime,
     isCk,
     isMongoDB,
     autoExecJobStatusText(status) {
@@ -1157,9 +1502,41 @@ export default {
       }
       return targetInfo.replace(/^\/+/, '');
     },
+    buildApprovalProgressSteps(process) {
+      const stateMap = { NEW: 'pending', RUNNING: 'active', COMPLETED: 'finished', REFUSE: 'failed', CANCELED: 'canceled' };
+      return process.activityList.map((activity) => {
+        const state = stateMap[activity.activityStatus];
+        let statusText = this.activityStatus[activity.activityStatus];
+        if (state === 'pending') {
+          statusText = this.$t('approval-task-WAITING');
+        }
+        let title = activity.teamName;
+        if (activity.approverType === APPROVAL_PARTICIPANT_TYPES.PERSON) {
+          title = activity.approvalTasks[0].approverName;
+        }
+
+        return {
+          key: `${process.ticketProcessId}:${activity.processActivityId}`,
+          title,
+          statusText,
+          statusClass: state === 'pending' ? 'init' : state,
+          state,
+          approvalActivity: activity,
+          approvalTasks: activity.approvalTasks
+        };
+      });
+    },
     selectTicketStep(step) {
       this.ticketStepManuallySelected = true;
       this.selectedStepKey = step.key;
+    },
+    toggleApprovalStep(key) {
+      const index = this.expandedApprovalStepKeys.indexOf(key);
+      if (index === -1) {
+        this.expandedApprovalStepKeys.push(key);
+      } else {
+        this.expandedApprovalStepKeys.splice(index, 1);
+      }
     },
     isAnalysisResultExpanded(activityTitle) {
       return this.analysisResultsExpanded && this.analysisResultTab === activityTitle;
@@ -1698,10 +2075,10 @@ export default {
       };
       this.showManualExecuteModal = true;
     },
-    handleShowAutoExecuteModal(type) {
+    resetExecutionConfig() {
       this.confirmInfo = {
         ticketId: this.ticketId,
-        confirmActionType: type,
+        confirmActionType: 'CONFIRM',
         comment: '',
         ddlSqlExecType: 'DIRECT',
         noneDdlSqlExecType: 'DIRECT',
@@ -1711,10 +2088,9 @@ export default {
           retryWaitTime: 111, // Unit seconds
           retryCount: 2, // Number of retries
           autoExecType: 'IMMEDIATE', // [IMMEDITE, SPECIFY TIME]
-          execTime: new Date() // Scheduled implementation time
+          execTime: dayjs() // Scheduled implementation time
         }
       };
-      this.showAutoExecuteModal = true;
     },
     handleShowRollbackSqlModal() {
       this.showRollbackSqlModal = true;
@@ -1797,7 +2173,7 @@ export default {
           item.execMsg = '';
           if (item.stageContext) {
             const stageContext = JSON.parse(item.stageContext);
-            item.execUserName = stageContext.execUserName ? stageContext.execUserName.join(',') : '';
+            item.execUserName = stageContext.execUserName ? stageContext.execUserName.join(', ') : '';
             item.execUserNameList = stageContext.execUserName;
             item.execMsg = stageContext.execMsg;
           }
@@ -1807,8 +2183,7 @@ export default {
             item.execUserNameList = [systemHandler];
           }
         });
-        const processSteps = this.ticketDetail.ticketProcessVOList || [];
-        const validStepKeys = new Set(['CREATE', ...processSteps.map((process) => String(process.ticketProcessId))]);
+        const validStepKeys = new Set(this.ticketProgressSteps.map((step) => step.key));
         if (!this.ticketStepManuallySelected || !validStepKeys.has(this.selectedStepKey)) {
           const currentStep = this.ticketProgressSteps.find((step) => ['active', 'failed'].includes(step.state));
           const defaultStep = currentStep || this.ticketProgressSteps[this.ticketProgressSteps.length - 1];
@@ -1878,9 +2253,10 @@ export default {
       this.confirmSubmitting = true;
       appLogger.debug(this.confirmInfo.confirmActionType);
       try {
-        const data = { ...this.confirmInfo };
+        if (!this.confirmInfo.requestId) this.confirmInfo.requestId = `confirm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const data = { ...this.confirmInfo, autoExecConfig: { ...this.confirmInfo.autoExecConfig } };
         if (this.confirmInfo.confirmActionType === 'CONFIRM') {
-          data.autoExecConfig.execTime = Date.parse(data.autoExecConfig.execTime);
+          data.autoExecConfig.execTime = data.autoExecConfig.execTime?.valueOf() ?? null;
         }
         const res = await this.$services.dmTicketConfirm({ data });
         if (res.success) {
@@ -1899,7 +2275,8 @@ export default {
       this.confirmSubmitting = true;
       this.confirmInfo.confirmActionType = 'CONFIRM';
       try {
-        const data = { ...this.confirmInfo };
+        if (!this.confirmInfo.requestId) this.confirmInfo.requestId = `confirm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const data = { ...this.confirmInfo, autoExecConfig: { ...this.confirmInfo.autoExecConfig } };
         data.autoExecConfig.execTime = null;
         const res = await this.$services.dmTicketConfirm({ data });
         if (res.success) {
@@ -1912,7 +2289,18 @@ export default {
       }
     },
 
-    handleShowApprovalModal() {
+    canApproveTask(step, task) {
+      if (!this.ticketDetail.canApproval || step.state !== 'active') {
+        return false;
+      }
+
+      if (step.approvalActivity) {
+        return task.status === APPROVAL_TASK_STATUSES.PENDING && task.approverUid === this.userInfo.uid;
+      }
+      return task.approverName === this.userInfo.username;
+    },
+    handleShowApprovalModal(processActivityId) {
+      this.approvalData.processActivityId = processActivityId;
       this.showApprovalModal = true;
     },
     async handleApproval() {
@@ -1921,6 +2309,7 @@ export default {
         data: {
           ticketId: this.ticketId,
           comment,
+          processActivityId: this.approvalData.processActivityId,
           rejected: rejected === 'true'
         }
       });
@@ -1942,7 +2331,6 @@ export default {
       this.showTicketContentModal = false;
       this.showManualExecuteModal = false;
       this.showCloseTicketModal = false;
-      this.showAutoExecuteModal = false;
       this.showAutoExecJobLogModal = false;
       this.showAutoExecTaskLogModal = false;
       this.showAutoExecTaskSQLModal = false;
@@ -1979,6 +2367,103 @@ export default {
 </script>
 
 <style lang="less" scoped>
+.ticket-approval-table {
+  min-width: 0;
+}
+.ticket-approval-comment {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.ticket-approval-overview {
+  margin-top: 16px;
+}
+.ticket-approval-progress {
+  padding: 0;
+  list-style: none;
+}
+.ticket-approval-progress .ticket-approval-row {
+  grid-template-columns: 28px 32px minmax(160px, 1.5fr) 96px minmax(115px, auto);
+  min-height: 48px;
+  padding: 8px 16px;
+  list-style: none;
+}
+.ticket-approval-row__rule {
+  min-width: 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+@media (max-width: 1079px) {
+  .ticket-approval-progress .ticket-approval-row {
+    grid-template-columns: 20px 32px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  .ticket-approval-row__rule {
+    grid-column: 3 / span 2;
+    text-align: left;
+  }
+}
+.ticket-processors {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  line-height: 24px;
+}
+
+.ticket-processors__summary {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-processors__more {
+  display: none;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #1b61c9;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ticket-processors--overflow .ticket-processors__more {
+  display: block;
+}
+
+.ticket-processors__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 8px;
+  min-height: 96px;
+  max-height: ~'min(360px, 50vh)';
+  margin: 0;
+  padding: 16px 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.ticket-processors__person {
+  min-width: 0;
+  max-width: ~'min(280px, 100%)';
+  padding: 4px 12px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .horizontal-align {
   display: flex;
   align-items: center;
@@ -2371,52 +2856,38 @@ export default {
   }
 }
 
+.ticket-approval-form :deep(.ivu-form-item) {
+  margin-bottom: 16px;
+}
+
+.ticket-approval-form :deep(.ivu-form-item:last-child) {
+  margin-bottom: 0;
+}
+
+.ticket-execute-config__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
 .ticket-execute-form {
-  padding: 8px 4px 12px;
+  padding: 8px 0;
 
   :deep(.ivu-form-item) {
-    margin-bottom: 28px;
+    margin-bottom: 16px;
   }
 
   :deep(.ivu-form-item:last-child) {
     margin-bottom: 0;
-  }
-
-  :deep(.ivu-form-item-label) {
-    float: none;
-    display: block;
-    width: auto !important;
-    margin-bottom: 12px;
-    padding: 0;
-    color: var(--text-secondary);
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 22px;
-    text-align: left;
-  }
-
-  :deep(.ivu-form-item-content) {
-    margin-left: 0 !important;
-    line-height: 22px;
-  }
-
-  :deep(.ivu-input) {
-    padding: 10px 12px;
-    line-height: 22px;
-  }
-
-  :deep(.ticket-execute-comment) {
-    min-height: 88px;
-    padding: 10px 12px;
-    line-height: 22px;
-    resize: vertical;
   }
 }
 
 .ticket-execute-mode-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px 32px;
+  gap: 8px 16px;
 
   :deep(.ivu-radio-wrapper) {
     margin-right: 0;
@@ -2424,40 +2895,15 @@ export default {
   }
 }
 
-.ticket-execute-schedule-row {
-  display: flex;
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.ticket-execute-schedule-label {
-  flex: none;
-  color: var(--text-secondary);
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 22px;
-}
-
 .ticket-execute-schedule {
   width: 100%;
   max-width: 320px;
 }
 
-.ticket-execute-transaction {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 14px 16px;
-  border-radius: 8px;
-  color: var(--text-secondary);
-  background: var(--bg-secondary);
-  line-height: 22px;
-
-  :deep(.ivu-switch) {
-    flex: none;
-  }
+.ticket-transaction-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .ellipsis {
@@ -2821,7 +3267,8 @@ export default {
 
 .ticket-state-badge--neutral,
 .analysis-item-status.status-init,
-.analysis-item-status.status-pending {
+.analysis-item-status.status-pending,
+.analysis-item-status.status-canceled {
   color: var(--text-secondary);
   background: var(--bg-tertiary);
 }
@@ -2975,7 +3422,7 @@ export default {
   line-height: 18px;
 }
 
-.ticket-meta-item--target-database :deep(.ivu-tooltip-rel) {
+.ticket-meta-item--target-database :deep(.ivu-poptip-rel) {
   display: block;
   min-width: 0;
   max-width: 100%;
@@ -2996,7 +3443,7 @@ export default {
   white-space: nowrap;
 }
 
-.ticket-meta-item--description :deep(.ivu-tooltip-rel) {
+.ticket-meta-item--description :deep(.ivu-poptip-rel) {
   display: block;
   max-width: 100%;
 }
@@ -3045,7 +3492,7 @@ export default {
   --ticket-progress-connector-gap: clamp(4px, 0.8cqw, 12px);
 
   position: relative;
-  align-items: flex-start;
+  align-items: center;
   width: 100%;
   min-width: 840px;
 }
@@ -3066,10 +3513,6 @@ export default {
 
 .ticket-progress-step:hover {
   background: transparent;
-}
-
-.ticket-progress-step:hover .ticket-progress-step__icon {
-  transform: translateY(-1px);
 }
 
 .ticket-progress-step.is-selected .ticket-progress-step__content strong,
@@ -3093,7 +3536,6 @@ export default {
   color: var(--text-tertiary);
   background: var(--bg-tertiary);
   font-size: clamp(15px, 1.4cqw, 17px);
-  transition: transform 0.15s ease;
 }
 
 .ticket-progress-step--finished .ticket-progress-step__icon {
@@ -3145,7 +3587,7 @@ export default {
   flex: 1 1 var(--ticket-progress-connector-width);
   min-width: var(--ticket-progress-connector-width);
   height: 2px;
-  margin: calc(var(--ticket-progress-icon-size) / 2 + 2px) var(--ticket-progress-connector-gap) 0;
+  margin: 0 var(--ticket-progress-connector-gap);
   border-radius: 1px;
   background: var(--border-primary);
 }
@@ -3396,22 +3838,28 @@ export default {
   transform: translateY(1px);
 }
 
-.analysis-result-details.ticket-execution-body {
-  padding: 0;
-  border-top: 0;
-  background: var(--bg-card);
+.ticket-execution-actions :deep(.ant-btn-link:focus-visible) {
+  outline: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .ticket-execution-table {
   overflow-x: auto;
 }
 
+.ticket-approval-table :deep(.ant-table-wrapper),
 .ticket-execution-table :deep(.ivu-table-wrapper-with-border),
 .analysis-result-details--table :deep(.ivu-table-wrapper-with-border),
 .ticket-execution-table :deep(.ant-table-wrapper),
 .analysis-result-details--table :deep(.ant-table-wrapper) {
   border: 0;
   border-radius: 0;
+}
+
+.ticket-approval-table :deep(.ant-table-thead > tr > th),
+.analysis-result-details--table :deep(.ant-table-thead > tr > th) {
+  border-radius: 0 !important;
 }
 
 .ticket-execution-table :deep(.ivu-table::before),
@@ -3428,6 +3876,7 @@ export default {
   border-right: 0;
 }
 
+.ticket-approval-table :deep(.ant-table-tbody > tr:last-child > td),
 .ticket-execution-table :deep(.ivu-table-tbody tr:last-child td),
 .analysis-result-details--table :deep(.ivu-table-tbody tr:last-child td),
 .analysis-result-details--table :deep(.ant-table-tbody > tr:last-child > td) {
@@ -3470,6 +3919,7 @@ export default {
 .ticket-execution-pagination {
   display: flex;
   justify-content: flex-end;
+  border-top: 1px solid var(--border-light);
   padding: 12px 16px;
 }
 
@@ -3895,6 +4345,15 @@ export default {
   .ticket-detail-page .ticket-detail-container {
     padding-right: 12px;
     padding-left: 12px;
+  }
+
+  .ticket-execute-config .analysis-summary-row {
+    grid-template-columns: 28px 32px minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .ticket-execute-config .analysis-summary-row__result {
+    grid-column: ~'3 / 5';
   }
 
   .ticket-info-section__heading {

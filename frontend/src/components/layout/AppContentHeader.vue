@@ -49,10 +49,10 @@ export default {
   components: { AppUserActions },
   emits: ['check-version'],
   computed: {
-    ...mapGetters(['includesDM', 'isDesktop']),
+    ...mapGetters(['isDesktop']),
     ...mapState(['dmGlobalSetting', 'myCatLog', 'mySystemMenuItems', 'sidebarMenu', 'userInfo']),
     showSqlLink() {
-      return this.includesDM && this.myCatLog.includes('CAT_DM_CONSOLE') && !this.$route.path.startsWith('/sql');
+      return this.myCatLog.includes('CAT_DM_CONSOLE') && !this.$route.path.startsWith('/sql');
     },
     pageTitle() {
       const path = this.$route.path;
@@ -72,6 +72,7 @@ export default {
       if (path.indexOf('/settings/profile') === 0 || path.indexOf('/system/profile') > -1) {
         return this.$t('ge-ren-zi-liao');
       }
+      if (path.indexOf('/settings/ai') === 0) return this.$t('ai.settings');
       if (path.indexOf('/settings/preferences') === 0 || path.indexOf('/system/preference') > -1) {
         return this.$t('nav-tong-yong');
       }
@@ -81,7 +82,7 @@ export default {
         }
         return this.$t('my-permissions');
       }
-      if (path.indexOf('/datasource') === 0 || path.indexOf('/system/ccdatasource') > -1) {
+      if (path.indexOf('/datasource') === 0) {
         return this.$t('nav-shu-ju-ku-guan-li');
       }
       if (path === '/env' || path.indexOf('/env/') === 0 || path.indexOf('/system/env') > -1) {
@@ -360,6 +361,12 @@ export default {
         return [
           { label: this.$t('nav-sso'), to: '/integrations/sso' },
           { label: this.$t('pei-zhi'), to: path }
+        ];
+      }
+      if (/^\/integrations\/approval\/internal\/[^/]+\/edit$/.test(path)) {
+        return [
+          { label: this.$t('nav-shen-pi-yin-qing'), to: '/integrations/approval' },
+          { label: this.$route.query.engineName || this.$t('approval-internal-engine'), to: path }
         ];
       }
       if (path === '/integrations/approval/create') {

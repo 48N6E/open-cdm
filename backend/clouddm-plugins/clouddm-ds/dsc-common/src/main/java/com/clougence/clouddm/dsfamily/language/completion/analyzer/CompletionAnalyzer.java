@@ -2,6 +2,16 @@
  * Copyright 2026 杭州开云集致科技有限公司
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.clougence.clouddm.dsfamily.language.completion.analyzer;
 
@@ -145,18 +155,25 @@ public class CompletionAnalyzer {
             stream.fill();
 
             List<CompletionToken> result = new ArrayList<>();
+            int sourceOffset = 0;
+            int sourceCodePoint = 0;
             for (Token token : stream.getTokens()) {
                 if (token.getType() == Token.EOF || token.getChannel() != Token.DEFAULT_CHANNEL || StringUtils.isBlank(token.getText())) {
                     continue;
                 }
+                // ANTLR CharStreams use code points; editor offsets use UTF-16.
+                int start = sqlText.offsetByCodePoints(sourceOffset, token.getStartIndex() - sourceCodePoint);
+                int end = sqlText.offsetByCodePoints(start, token.getStopIndex() - token.getStartIndex() + 1);
+                sourceOffset = end;
+                sourceCodePoint = token.getStopIndex() + 1;
                 result.add(CompletionToken.builder()
                     .text(token.getText())
                     .type(token.getType())
                     .channel(token.getChannel())
                     .line(token.getLine())
                     .column(token.getCharPositionInLine())
-                    .startIndex(token.getStartIndex())
-                    .stopIndex(token.getStopIndex())
+                    .startIndex(start)
+                    .stopIndex(end - 1)
                     .build());
             }
             return result;

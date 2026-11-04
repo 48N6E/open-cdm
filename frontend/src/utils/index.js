@@ -27,7 +27,7 @@ export const dsGroup = {
     'Hologres',
     'CockroachDB'
   ],
-  noStruct: ['Redis', 'Valkey'],
+  noStruct: ['Redis', 'Valkey', 'Etcd'],
   supportTransaction: ['MySQL', 'PostgreSQL', 'Greenplum', 'Cloudberry', 'CockroachDB']
 };
 

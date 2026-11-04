@@ -113,8 +113,15 @@
   }
 }
 
-.ant-btn-dangerous {
-  background-color: #ff4d4f;
+.ant-btn-link.ant-btn-dangerous:not(:disabled) {
+  color: @error-color;
+  background: transparent;
+
+  &:hover,
+  &:focus {
+    color: @error-color;
+    background: transparent;
+  }
 }
 
 .ant-btn-primary.ant-btn-dangerous:not(:disabled) {
@@ -536,21 +543,8 @@
   color: @primary-color;
 }
 
-.ant-tooltip-inner {
-  background: #fff;
-  color: #000;
-}
-
-.ant-tooltip-arrow::before {
-  background-color: #fff;
-}
-
 .contextmenu_menu {
   padding: 0 !important;
-}
-
-.ant-tooltip {
-  max-width: 100000000px !important;
 }
 
 .ant-checkbox + span {

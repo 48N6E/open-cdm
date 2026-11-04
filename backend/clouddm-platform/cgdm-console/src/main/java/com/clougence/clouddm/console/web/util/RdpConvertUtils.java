@@ -22,7 +22,6 @@ import java.util.stream.Collectors;
 import com.clougence.clouddm.base.metadata.ds.ConfigValType;
 import com.clougence.clouddm.console.web.component.approval.model.ApprovalAnalysisStateMO;
 import com.clougence.clouddm.console.web.component.approval.model.ApprovalExecutionStateMO;
-import com.clougence.clouddm.console.web.component.config.RootUserConfig;
 import com.clougence.clouddm.console.web.component.config.UserConfigKvDef;
 import com.clougence.clouddm.console.web.component.dsconfig.mode.DsConfigKvDef;
 import com.clougence.clouddm.console.web.constants.LoginAuthType;
@@ -48,7 +47,6 @@ import com.clougence.clouddm.platform.dal.model.auth.*;
 import com.clougence.clouddm.platform.dal.model.datasource.DmDsConfigKv4DmDO;
 import com.clougence.clouddm.platform.dal.model.datasource.DmDsDO;
 import com.clougence.clouddm.platform.dal.model.system.DmSysUserConfDO;
-import com.clougence.clouddm.sdk.approval.ApprovalProvider;
 import com.clougence.clouddm.sdk.security.auth.AuthInfo;
 import com.clougence.clouddm.sdk.security.auth.AuthInfoType;
 import com.clougence.clouddm.sdk.security.auth.AuthKind;
@@ -570,21 +568,6 @@ public class RdpConvertUtils {
         return user;
     }
 
-    public static String convertToApprovalEnableConfigKey(ApprovalProvider type) {
-        switch (type) {
-            case Feishu:
-                return RootUserConfig.Fields.feishuEnableApprovalService;
-            case Wechat:
-                return RootUserConfig.Fields.wechatEnableApprovalService;
-            case DingTalk:
-                return RootUserConfig.Fields.dingEnableApprovalService;
-            case Internal:
-            case Custom:
-            default:
-                return null;
-        }
-    }
-
     public static RdpTicketProcessVO convertToTicketProcessVO(DmApprovalProcessDO processDO) {
         RdpTicketProcessVO vo = new RdpTicketProcessVO();
         vo.setTicketProcessId(processDO.getId());
@@ -673,7 +656,13 @@ public class RdpConvertUtils {
         vo.setTicketTitle(ticketDO.getTicketTitle());
         vo.setTicketStatus(ticketDO.getTicketStatus());
         vo.setFinishTime(DateFormatType.s_yyyyMMdd_HHmmss.format(ticketDO.getFinishTime()));
-        vo.setUserName(ownerUserDO == null ? DmI18nUtils.getMessage(I18nRdpMsgKeys.USER_NOT_EXIST_ERROR.name()) : ownerUserDO.getUsername());
+        if (ownerUserDO == null) {
+            vo.setUserName(DmI18nUtils.getMessage(I18nRdpMsgKeys.USER_NOT_EXIST_ERROR.name()));
+        } else if (StringUtils.isBlank(ownerUserDO.getUsername())) {
+            vo.setUserName(ownerUserDO.getAccount());
+        } else {
+            vo.setUserName(ownerUserDO.getUsername());
+        }
         vo.setResourceType(resourceType);
         return vo;
     }

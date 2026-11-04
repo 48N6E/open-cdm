@@ -1,6 +1,6 @@
 .cache
 test-work
-/out/
+**/out/
 .DS_Store
 _book
 dependency-reduced-pom.xml
@@ -54,6 +54,7 @@ install_upgrade.log
 *.local.md
 
 .claude
+.design_docs
 
 # local config and secrets
 *.local.yml
@@ -67,6 +68,3 @@ install_upgrade.log
 *.jks
 *.keystore
 *.truststore
-
-# local-only docker compose / scripts (fork main; never for upstream PR)
-/package/local-docker/

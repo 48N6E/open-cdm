@@ -3,13 +3,19 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.clougence.clouddm.ds.dameng.sql.analysis.reference;
 
-import static com.clougence.sql.common.registry.RegisteredResourceType.FUNCTION;
-import static com.clougence.sql.common.registry.RegisteredResourceType.PROCEDURE;
-import static com.clougence.sql.common.registry.RegisteredResourceType.TABLE;
-import static com.clougence.sql.common.registry.RegisteredResourceType.TYPE;
+import static com.clougence.sql.common.registry.RegisteredResourceType.*;
 
 import java.util.*;
 
@@ -210,13 +216,19 @@ public final class DmResourceRegistry {
         functionBehaviors.register(FUNCTION, DM8, DM8, BehaviorAction.READ, "SF_GET_PARA_STRING_VALUE");
         functionBehaviors.register(FUNCTION, DM8, DM8, BehaviorAction.READ, "SF_GET_PARA_VALUE");
         functionBehaviors.register(FUNCTION, DM8, DM8, BehaviorAction.READ, "SF_GET_SESSION_MPP_SELECT_LOCAL");
+        functionBehaviors.register(FUNCTION, DM8, DM8, BehaviorAction.READ, "SF_GET_SESSION_PARA_DOUBLE_VALUE");
+        functionBehaviors.register(FUNCTION, DM8, DM8, BehaviorAction.READ, "SF_GET_SESSION_PARA_STRING_VALUE");
         functionBehaviors.register(FUNCTION, DM8, DM8, BehaviorAction.READ, "SF_GET_SESSION_PARA_VALUE");
+        functionTypes.register(FUNCTION, DM8, DM8, SplitQueryType.SESSION_VARIABLE_RW, "SF_GET_SESSION_PARA_DOUBLE_VALUE");
+        functionTypes.register(FUNCTION, DM8, DM8, SplitQueryType.SESSION_VARIABLE_RW, "SF_GET_SESSION_PARA_STRING_VALUE");
         functionTypes.register(FUNCTION, DM8, DM8, SplitQueryType.SESSION_VARIABLE_RW, "SF_GET_SESSION_PARA_VALUE");
         functionBehaviors.register(FUNCTION, DM8, DM8, BehaviorAction.ALTER, "SF_MPP_INST_ADD");
         functionBehaviors.register(FUNCTION, DM8, DM8, BehaviorAction.UNSAFE, "SF_MPP_INST_REMOVE");
         functionConfigArguments.register(FUNCTION, DM8, DM8, 1, "SF_GET_PARA_DOUBLE_VALUE");
         functionConfigArguments.register(FUNCTION, DM8, DM8, 1, "SF_GET_PARA_STRING_VALUE");
         functionConfigArguments.register(FUNCTION, DM8, DM8, 1, "SF_GET_PARA_VALUE");
+        functionConfigArguments.register(FUNCTION, DM8, DM8, 0, "SF_GET_SESSION_PARA_DOUBLE_VALUE");
+        functionConfigArguments.register(FUNCTION, DM8, DM8, 0, "SF_GET_SESSION_PARA_STRING_VALUE");
         functionConfigArguments.register(FUNCTION, DM8, DM8, 0, "SF_GET_SESSION_PARA_VALUE");
         functionBehaviors.register(FUNCTION, DM8, DM8, BehaviorAction.CREATE, "DBMS_SQLTUNE", "CREATE_TUNING_TASK");
         functionBehaviors.register(FUNCTION, DM8, DM8, BehaviorAction.CALL, "DBMS_SQLTUNE", "EXECUTE_TUNING_TASK");

@@ -23,6 +23,8 @@ import com.clougence.clouddm.base.metadata.ds.DataSourceType;
 import com.clougence.clouddm.base.metadata.ds.DsConfigGroup;
 import com.clougence.clouddm.base.metadata.ds.SslMode;
 import com.clougence.clouddm.ds.cockroachdb.i18n.CrdbConfigI18nKeys;
+import com.clougence.clouddm.ds.cockroachdb.sql.CrdbSqlEngineSpi;
+import com.clougence.sql.postgres.PgSqlEngineSpi;
 import com.clougence.clouddm.sdk.execute.dsconf.Serialization;
 import com.clougence.drivers.DsConfigKeys;
 import com.clougence.utils.StringUtils;
@@ -39,10 +41,10 @@ import lombok.experimental.FieldNameConstants;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CrdbConfig extends DataSourceConfig {
 
-    @ConfigDef(name = Fields.defaultCatalog, //
+    @ConfigDef(name = Fields.defaultCatalog, defaultValue = "defaultdb", //
             group = DsConfigGroup.GENERAL, labelKey = CrdbConfigI18nKeys.CONFIG_RDB_DEFAULT_DB_LABEL, descKey = CrdbConfigI18nKeys.CONFIG_RDB_DEFAULT_DB_DESC, readOnly = false)
     private String  defaultCatalog;
-    @ConfigDef(name = Fields.defaultSchema, //
+    @ConfigDef(name = Fields.defaultSchema, defaultValue = "public", //
             group = DsConfigGroup.GENERAL, labelKey = CrdbConfigI18nKeys.CONFIG_RDB_DEFAULT_SCHEMA_LABEL, descKey = CrdbConfigI18nKeys.CONFIG_RDB_DEFAULT_SCHEMA_DESC, readOnly = false)
     private String  defaultSchema;
     @ConfigDef(name = Fields.clientTimeZone, //
@@ -57,9 +59,16 @@ public class CrdbConfig extends DataSourceConfig {
 
     public CrdbConfig(){
         setDataSourceType(DataSourceType.CockroachDB);
-        setDefaultCatalog("defaultdb");
-        setDefaultSchema("public");
-        setSslMode(SslMode.TRUST);
+    }
+
+    @Override
+    public String getSqlEngine() {
+        String engine = super.getSqlEngine();
+        // Existing CockroachDB connections stored the formerly bound PostgreSQL engine.
+        if (PgSqlEngineSpi.NAME.equals(engine)) {
+            return CrdbSqlEngineSpi.NAME;
+        }
+        return engine;
     }
 
     public Properties asDriverProperties() {
@@ -78,23 +87,11 @@ public class CrdbConfig extends DataSourceConfig {
         if (this.getSslMode() != null) {
             switch (this.getSslMode()) {
                 case CA -> {
-                    if (!hasSslCaConfig()) {
-                        throw new IllegalArgumentException("CockroachDB CA certificate is required.");
-                    }
                     if (StringUtils.isNotBlank(this.getSslCaFilePath())) {
                         properties.setProperty("sslrootcert", this.getSslCaFilePath());
                     }
                 }
                 case CLIENT_CERT -> {
-                    if (!hasSslCaConfig()) {
-                        throw new IllegalArgumentException("CockroachDB CA certificate is required.");
-                    }
-                    if (!hasSslClientCertConfig()) {
-                        throw new IllegalArgumentException("CockroachDB client certificate is required.");
-                    }
-                    if (!hasSslClientKeyConfig()) {
-                        throw new IllegalArgumentException("CockroachDB client private key is required.");
-                    }
                     if (StringUtils.isBlank(this.getSslCaFilePath()) || StringUtils.isBlank(this.getSslClientCertFilePath())
                         || StringUtils.isBlank(this.getSslClientKeyFilePath())) {
                         break;
@@ -111,18 +108,6 @@ public class CrdbConfig extends DataSourceConfig {
             }
         }
         return properties;
-    }
-
-    private boolean hasSslCaConfig() {
-        return StringUtils.isNotBlank(this.getSslCaFilePath()) || StringUtils.isNotBlank(this.getSslCaData());
-    }
-
-    private boolean hasSslClientCertConfig() {
-        return StringUtils.isNotBlank(this.getSslClientCertFilePath()) || StringUtils.isNotBlank(this.getSslClientCertData());
-    }
-
-    private boolean hasSslClientKeyConfig() {
-        return StringUtils.isNotBlank(this.getSslClientKeyFilePath()) || StringUtils.isNotBlank(this.getSslClientKeyData());
     }
 
     private String pgSslMode() {

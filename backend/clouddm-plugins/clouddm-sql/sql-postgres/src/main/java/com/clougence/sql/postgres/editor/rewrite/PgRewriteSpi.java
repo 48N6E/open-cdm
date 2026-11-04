@@ -38,7 +38,11 @@ public class PgRewriteSpi implements RewriteSpi {
     private final PgDslProvider provider;
 
     public PgRewriteSpi(PostgresVersion version){
-        this.provider = new PgDslProvider(version);
+        this(new PgDslProvider(version));
+    }
+
+    public PgRewriteSpi(PgDslProvider provider){
+        this.provider = provider;
     }
 
     public PostgresVersion version() {
@@ -63,11 +67,20 @@ public class PgRewriteSpi implements RewriteSpi {
     }
 
     private boolean rewriterLimit(TokenStreamRewriter rewriter, ParseTree astTree, long maxLimit) {
-        PgSqlParser.SelectstmtContext selectStmt = ((PgSqlParser.StmtContext) astTree).selectstmt();
+        PgSqlParser.Pg_stmtContext statement = ((PgSqlParser.StmtContext) astTree).pg_stmt();
+        if (statement == null) {
+            return false;
+        }
+        PgSqlParser.SelectstmtContext selectStmt = statement.selectstmt();
+        // Cursor statements and EXPLAIN ANALYZE can carry SELECT semantics, but only a top-level
+        // SELECT may be safely constrained by the query editor's result limit.
+        if (selectStmt == null || selectStmt.select_no_parens() == null) {
+            return false;
+        }
         PgSqlParser.Select_clauseContext clauseContext = selectStmt.select_no_parens().select_clause();
 
         List<PgSqlParser.Simple_select_pramaryContext> contexts = clauseContext.simple_select_pramary();
-        if (contexts.size() > 1) {
+        if (contexts.size() != 1) {
             return false;
         }
 
@@ -76,8 +89,17 @@ public class PgRewriteSpi implements RewriteSpi {
             return false;
         }
 
+        PgSqlParser.Select_no_parensContext select = selectStmt.select_no_parens();
         PgSqlParser.Select_limitContext limitContext = simple.select_limit();
+        if (limitContext == null && select.select_limit_() != null) {
+            limitContext = select.select_limit_().select_limit();
+        }
+
         if (limitContext != null) {
+            if (limitContext.limit_clause() == null || limitContext.limit_clause().select_limit_value() == null) {
+                return false;
+            }
+
             PgSqlParser.Select_limit_valueContext limit = limitContext.limit_clause().select_limit_value();
 
             long sqlLimit = Long.parseLong(limit.getText());
@@ -89,7 +111,11 @@ public class PgRewriteSpi implements RewriteSpi {
                 return false;
             }
         } else {
-            rewriter.insertAfter(simple.getStop(), " LIMIT " + maxLimit);
+            if (select.sort_clause_() != null) {
+                rewriter.insertAfter(select.sort_clause_().getStop(), " LIMIT " + maxLimit);
+            } else {
+                rewriter.insertAfter(simple.getStop(), " LIMIT " + maxLimit);
+            }
             return true;
         }
     }

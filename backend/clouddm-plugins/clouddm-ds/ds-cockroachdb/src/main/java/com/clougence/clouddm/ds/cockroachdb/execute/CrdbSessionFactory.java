@@ -17,7 +17,7 @@ package com.clougence.clouddm.ds.cockroachdb.execute;
 
 import java.sql.Connection;
 
-import com.clougence.clouddm.ds.cockroachdb.dsconf.CrdbConfig;
+import com.clougence.clouddm.base.metadata.ds.DataSourceConfig;
 import com.clougence.clouddm.dsfamily.execute.RdbSessionFactory;
 import com.clougence.clouddm.dsfamily.postgres.execute.PgSession;
 import com.clougence.clouddm.sdk.execute.resource.DsResourceManager;
@@ -25,11 +25,11 @@ import com.clougence.clouddm.sdk.execute.session.Session;
 import com.clougence.clouddm.sdk.execute.session.SessionContextDTO;
 import com.clougence.drivers.DsObject;
 
-public class CrdbSessionFactory extends RdbSessionFactory<CrdbConfig> {
+public class CrdbSessionFactory extends RdbSessionFactory<DataSourceConfig> {
 
     @Override
-    protected Session newSession(CrdbConfig dsConfig, SessionContextDTO contextDTO, DsObject<Connection> dsObject, DsResourceManager ownerRM) throws Exception {
-        PgSession session = new PgSession(contextDTO.getSessionId(), dsConfig, dsObject);
+    protected Session newSession(DataSourceConfig dsConfig, SessionContextDTO contextDTO, DsObject<Connection> dsObject, DsResourceManager ownerRM) throws Exception {
+        PgSession session = new PgSession(contextDTO.getSessionId(), dsConfig, dsObject, new CrdbHooks());
         session.initSession(ownerRM, contextDTO);
         return session;
     }

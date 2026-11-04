@@ -2,6 +2,16 @@
  * Copyright 2026 杭州开云集致科技有限公司
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.clougence.clouddm.ds.mongodb.language;
 
@@ -20,6 +30,7 @@ import com.clougence.clouddm.sdk.service.execute.MetaCol;
 import com.clougence.clouddm.sdk.service.execute.MetaObj;
 import com.clougence.clouddm.sdk.service.execute.MetaService;
 import com.clougence.schema.umi.struts.UmiTypes;
+import com.clougence.sql.mongodb.parser.ast.commands.db.MongoAdminReadCommands;
 import com.clougence.utils.StringUtils;
 
 public class MongoCompletionStrategyCenter extends CompletionStrategyCenter {
@@ -31,8 +42,46 @@ public class MongoCompletionStrategyCenter extends CompletionStrategyCenter {
 
     @Override
     protected void register(List<CompletionStrategy> strategies) {
+        // Higher than field strategy so rs./sh. are not treated as collection qualifiers.
+        strategies.add(new MongoShellHelperCompletionStrategy());
         strategies.add(new MongoCollectionCompletionStrategy());
         strategies.add(new MongoFieldCompletionStrategy());
+    }
+
+    private static class MongoShellHelperCompletionStrategy implements CompletionStrategy {
+        @Override
+        public int weight() {
+            return 300;
+        }
+
+        @Override
+        public boolean match(CompletionContext context) {
+            if (context.getPreviousSignificantChar() != '.') {
+                return false;
+            }
+            String qualifier = context.getQualifier();
+            return "rs".equalsIgnoreCase(qualifier) || "sh".equalsIgnoreCase(qualifier);
+        }
+
+        @Override
+        public List<CompletionItem> complete(CompletionContext context, MetaService metaService) {
+            List<String> methods = "rs".equalsIgnoreCase(context.getQualifier()) ? MongoAdminReadCommands.listRsMethods() : MongoAdminReadCommands.listShMethods();
+            List<CompletionItem> items = new ArrayList<>();
+            for (String method : methods) {
+                if (!context.matchPrefix(method)) {
+                    continue;
+                }
+                CompletionItem item = new CompletionItem();
+                item.setLabel(method);
+                item.setKind(CompletionItemKind.FUNCTION);
+                item.setUmiType(UmiTypes.Function);
+                item.setIcon("FUNCTION");
+                item.setInsertText(method + "()");
+                item.setWeight(850);
+                items.add(item);
+            }
+            return items;
+        }
     }
 
     private static class MongoCollectionCompletionStrategy implements CompletionStrategy {

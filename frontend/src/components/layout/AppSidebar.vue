@@ -52,6 +52,9 @@
           </div>
         </div>
       </template>
+      <button v-if="aiCapabilitiesError" type="button" class="app-sidebar-item" @click="$store.dispatch('loadAiCapabilities')">
+        {{ $t('ai.retryCapabilities') }}
+      </button>
     </nav>
 
     <footer v-if="displaySidebarVersion" class="app-sidebar-footer">
@@ -79,8 +82,8 @@ export default {
     };
   },
   computed: {
-    ...mapGetters(['includesDM', 'isDesktop']),
-    ...mapState(['myCatLog', 'userInfo', 'sidebarMenu', 'defaultRedirectUrl', 'dmGlobalSetting']),
+    ...mapGetters(['isDesktop']),
+    ...mapState(['myCatLog', 'userInfo', 'sidebarMenu', 'defaultRedirectUrl', 'dmGlobalSetting', 'aiCapabilitiesError']),
     displaySidebarVersion() {
       return this.sidebarVersion || resolveDisplayVersion(this.dmGlobalSetting);
     },
@@ -101,7 +104,7 @@ export default {
       if (path.indexOf('/ticket') > -1) {
         return 'ticket';
       }
-      if (path.indexOf('/datasource') === 0 || path.indexOf('/system/ccdatasource') > -1) {
+      if (path.indexOf('/datasource') === 0) {
         return '/datasource';
       }
       if (path === '/env' || path.indexOf('/env/') === 0 || path.indexOf('/system/env') > -1) {
@@ -125,6 +128,7 @@ export default {
       if (path.indexOf('/settings/profile') === 0 || path.indexOf('/system/profile') > -1) {
         return '/settings/profile';
       }
+      if (path.indexOf('/settings/ai') === 0) return '/settings/ai';
       if (path.indexOf('/settings/preferences') === 0 || path.indexOf('/system/preference') > -1) {
         return '/settings/preferences';
       }
@@ -196,7 +200,7 @@ export default {
       }
     },
     handleGoHome() {
-      if (this.includesDM && this.myCatLog.includes('CAT_DM_CONSOLE')) {
+      if (this.myCatLog.includes('CAT_DM_CONSOLE')) {
         saveLastWorkbenchRoute(this.$route, this.userInfo?.uid);
         this.$router.push({ path: '/sql' }).catch(() => {});
         return;

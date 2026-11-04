@@ -3,11 +3,19 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.clougence.sql.sqlserver.analysis.behavior;
 
 import java.io.Reader;
-import java.io.StringReader;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -20,35 +28,25 @@ import com.clougence.clouddm.sdk.sql.parser.SplitQueryType;
 import com.clougence.dslpaser.antlr.DslHelper;
 import com.clougence.schema.umi.struts.UmiTypes;
 import com.clougence.sql.sqlserver.parser.MsSqlDslProvider;
-import com.clougence.sql.sqlserver.parser.MsSqlSplitAnalysisSpi;
 
 public class MsBehaviorAnalysisSpi implements BehaviorAnalysisSpi {
 
     private final SqlParserParameters parameters;
-    private final MsSqlSplitAnalysisSpi splitter;
 
     public MsBehaviorAnalysisSpi(SqlParserParameters parameters){
         this.parameters = SqlParserParameters.nullToEmpty(parameters);
-        this.splitter = new MsSqlSplitAnalysisSpi(this.parameters);
     }
 
     @Override
     public Stream<StatementBehavior> analysisBehaviorStream(Reader queryReader, Map<UmiTypes, Object> levels, int baseLine, int baseColumn) {
-        var scripts = this.splitter.splitScriptStream(queryReader, List.of(), baseLine, baseColumn);
-        return scripts.flatMap(script -> {
-            StringReader reader = new StringReader(script.getScript());
-            int codeLine = script.getBodyStartCodeLine();
-            int codeColumn = script.getBodyStartCodeColumn();
-
-            List<StatementBehavior> behaviors = analyzeStatement(reader, levels, codeLine, codeColumn);
-            if (Boolean.parseBoolean(this.parameters.get(SqlParserParameters.EXPECT_PLAN))) {
-                behaviors.forEach(behavior -> {
-                    behavior.setStatementType(SplitQueryType.SELECT);
-                    behavior.getRelations().forEach(relation -> relation.setAction(BehaviorAction.READ));
-                });
-            }
-            return behaviors.stream();
-        }).onClose(scripts::close);
+        List<StatementBehavior> behaviors = analyzeStatement(queryReader, levels, baseLine, baseColumn);
+        if (Boolean.parseBoolean(this.parameters.get(SqlParserParameters.EXPECT_PLAN))) {
+            behaviors.forEach(behavior -> {
+                behavior.setStatementType(SplitQueryType.SELECT);
+                behavior.getRelations().forEach(relation -> relation.setAction(BehaviorAction.READ));
+            });
+        }
+        return behaviors.stream();
     }
 
     private List<StatementBehavior> analyzeStatement(Reader queryReader, Map<UmiTypes, Object> levels, int baseLine, int baseColumn) {

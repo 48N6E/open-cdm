@@ -1,9 +1,25 @@
+/*
+ * Copyright 2026 杭州开云集致科技有限公司
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.clougence.sql.mysql;
 
 import java.io.StringReader;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Assertions;
@@ -16,6 +32,7 @@ import com.clougence.clouddm.sdk.service.execute.MetaService;
 import com.clougence.clouddm.sdk.service.secrules.RuleDomain;
 import com.clougence.clouddm.sdk.sql.SqlParserParameters;
 import com.clougence.clouddm.sdk.sql.analysis.behavior.StatementBehavior;
+import com.clougence.clouddm.sdk.sql.analysis.security.rdb.RdbIndexDomain;
 import com.clougence.clouddm.sdk.sql.editor.rewrite.RewriteContext;
 import com.clougence.dslpaser.antlr.AntlerSyntaxException;
 import com.clougence.schema.umi.struts.UmiTypes;
@@ -45,6 +62,14 @@ public class MySqlVersionConfigurationTest {
         Assertions.assertEquals(90701, MySqlVersion.parseExactVersion("9.7.1"));
         Assertions.assertEquals(100000, MySqlVersion.parseExactVersion("10.0.0"));
         Assertions.assertThrows(IllegalArgumentException.class, () -> MySqlVersion.parseExactVersion("mysql-8.0.22"));
+    }
+
+    @Test
+    public void mariaDbCompatibilityPrefixUsesServerVersion() {
+        MySqlParserConfig config = MySqlParserConfig.of("5.5.5-10.6.5-MariaDB", "MariaDB", null, false, Set.of());
+
+        Assertions.assertTrue(config.isMariaDb());
+        Assertions.assertEquals(100605, config.exactVersion());
     }
 
     @Test
@@ -160,6 +185,31 @@ public class MySqlVersionConfigurationTest {
         Assertions.assertThrows(AntlerSyntaxException.class, () -> {
             engine.rewriteSpi(knownEmpty).rewriteLimit(null, sql, rewriteContext);
         });
+    }
+
+    @Test
+    public void btreeIndexesAreAcceptedBySecurityAnalysis() {
+        MySqlEngineSpi engine = new MySqlEngineSpi(metaService());
+        String[] statements = { "ALTER TABLE `base_iot`.`device_feeding_record_snapshot` ADD INDEX `idx_record_id` (`feeding_record_id`) USING BTREE;",
+                                "ALTER TABLE `base_iot`.`device_gateway_version` ADD INDEX `idx_status_time` (`delete_flag`, `status`, `create_time`, `id`) USING BTREE;",
+                                "ALTER TABLE `base_iot`.`device_gateway` ADD INDEX `idx_serial_number` (`serial_number`) USING BTREE;",
+                                "ALTER TABLE t ADD INDEX idx USING BTREE (c);", "CREATE INDEX idx USING BTREE ON t (c);", "CREATE INDEX idx ON t (c) USING BTREE;",
+                                "ALTER TABLE t ADD PRIMARY KEY USING BTREE (c);", "ALTER TABLE t ADD UNIQUE INDEX idx (c) USING BTREE;" };
+        for (String sql : statements) {
+            try (StringReader reader = new StringReader(sql);
+                    Stream<RuleDomain> stream = engine.secDomainResolveSpi(parserParameters("")).resolveDomainStream(DataSourceType.MySQL, reader, 1, 0, null)) {
+                List<RuleDomain> domains = stream.toList();
+                Assertions.assertEquals(1, domains.size(), sql);
+            }
+        }
+
+        try (StringReader reader = new StringReader("CREATE UNIQUE INDEX idx USING BTREE ON t (c);");
+                Stream<RuleDomain> stream = engine.secDomainResolveSpi(parserParameters("")).resolveDomainStream(DataSourceType.MySQL, reader, 1, 0, null)) {
+            RdbIndexDomain index = (RdbIndexDomain) stream.toList().get(0);
+            Assertions.assertEquals("unique", index.getType());
+            Assertions.assertEquals("idx", index.getName());
+            Assertions.assertEquals(List.of("c"), index.getColumns());
+        }
     }
 
     private static SqlParserParameters parserParameters(String sqlMode) {

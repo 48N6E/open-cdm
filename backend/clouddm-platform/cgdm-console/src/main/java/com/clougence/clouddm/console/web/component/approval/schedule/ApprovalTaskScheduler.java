@@ -15,18 +15,23 @@
  */
 package com.clougence.clouddm.console.web.component.approval.schedule;
 
+import static com.clougence.clouddm.console.web.component.approval.CustomApprovalConstants.TEMPLATE_ID_PREFIX;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.*;
 
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import com.clougence.clouddm.console.web.component.approval.ApprovalFlowService;
+import com.clougence.clouddm.console.web.component.approval.CustomApprovalService;
 import com.clougence.clouddm.console.web.component.approval.impl.ApprovalProviderServiceImpl;
 import com.clougence.clouddm.console.web.global.i18n.DmI18nUtils;
 import com.clougence.clouddm.console.web.global.i18n.I18nRdpMsgKeys;
+import com.clougence.clouddm.console.web.service.approval.ApprovalControlService;
 import com.clougence.clouddm.console.web.service.datasource.DmDsWebService;
 import com.clougence.clouddm.platform.dal.access.ApprovalDal;
 import com.clougence.clouddm.platform.dal.model.LifeCycleState;
@@ -48,6 +53,10 @@ import lombok.extern.slf4j.Slf4j;
 public class ApprovalTaskScheduler {
     private static final int            THREAD_COUNT_MULTIPLIER = 2;
     private static final int            QUEUE_SIZE_MULTIPLIER   = 3;
+    private static final int            SCAN_BATCH_SIZE         = 20;
+
+    private final ApprovalScanCursor    activeScan              = new ApprovalScanCursor(false, TimeUnit.SECONDS.toMillis(5));
+    private final ApprovalScanCursor    idleScan                = new ApprovalScanCursor(true, TimeUnit.SECONDS.toMillis(60));
 
     @Resource
     private ApprovalDal                 approvalDal;
@@ -57,12 +66,17 @@ public class ApprovalTaskScheduler {
     private ApprovalTaskProcessor       taskProcessor;
     @Resource
     private DmDsWebService              dsService;
+    @Lazy
+    @Resource
+    private ApprovalControlService      approvalControlService;
+    @Resource
+    private CustomApprovalService       customApprovalService;
     @Resource
     private ApprovalProviderServiceImpl approvalProviderServiceImpl;
     @Resource
     private ApplicationContext          applicationContext;
 
-    ThreadPoolExecutor                  threadPoolExecutor;
+    private ThreadPoolExecutor          threadPoolExecutor;
     private Thread                      scheduleWorkThread;
     private Set<Long>                   taskInQueueSet;
     private Set<Long>                   controlTaskInQueueSet;
@@ -82,35 +96,46 @@ public class ApprovalTaskScheduler {
     private void loopSchedule() {
         while (true) {
             try {
-                doSchedule();
-                if (Thread.currentThread().isInterrupted()) {
-                    log.warn("[TicketTask] thread exit, (" + Thread.currentThread().getName() + ")");
-                    return;
-                }
-                ThreadUtils.safeSleep(1000);
+                doSchedule(this.activeScan);
+                doSchedule(this.idleScan);
             } catch (Throwable e) {
-                log.error("[TicketTask] error " + e.getMessage(), e);
+                log.error("Approval scan failed", e);
+            }
+
+            if (Thread.currentThread().isInterrupted()) {
+                return;
+            }
+
+            if (!ThreadUtils.safeSleep(1000)) {
+                return;
             }
         }
     }
 
-    private void doSchedule() {
-        List<Long> ticketList = this.approvalDal.approvalMapper().listUnFinishTicketIdList();
-
-        // there is nothing to do.
-        if (ticketList.isEmpty()) {
-            ThreadUtils.sleep(5, TimeUnit.SECONDS);
+    private void doSchedule(ApprovalScanCursor scan) {
+        if (System.currentTimeMillis() < scan.getNextScanTime()) {
             return;
         }
 
-        int submitted = 0;
-        for (Long tickId : ticketList) {
-            if (trySchedule(tickId)) {
-                submitted++;
-            }
+        if (scan.getUpperId() == 0) {
+            // A finite sweep lets older tickets run again even while new tickets are created.
+            scan.setUpperId(this.approvalDal.approvalMapper().queryScheduleUpperId());
         }
-        if (submitted > 0) {
-            log.info("[Rdp TicketTask] submitted " + submitted + " task.");
+
+        List<Long> ticketList = this.approvalDal.approvalMapper().listScheduleTicketIds(scan.getAfterId(), scan.getUpperId(), scan.isIdle(), SCAN_BATCH_SIZE);
+        for (Long ticketId : ticketList) {
+            if (!this.taskInQueueSet.contains(ticketId) && !trySchedule(ticketId)) {
+                // Resume at the first unsubmitted ticket after the executor has capacity.
+                return;
+            }
+
+            scan.setAfterId(ticketId);
+        }
+
+        if (ticketList.size() < SCAN_BATCH_SIZE || scan.getAfterId() == scan.getUpperId()) {
+            scan.setAfterId(0);
+            scan.setUpperId(0);
+            scan.setNextScanTime(System.currentTimeMillis() + scan.getIntervalMillis());
         }
     }
 
@@ -119,15 +144,18 @@ public class ApprovalTaskScheduler {
         if (executor == null || this.taskInQueueSet == null) {
             return false;
         }
+
         try {
             // is running or on queue， avoid repeat ticket task
             if (!this.taskInQueueSet.add(approvalId)) {
                 return false;
             }
-            executor.submit(() -> {
+
+            executor.execute(() -> {
                 try {
-                    this.approvalDal.approvalMapper().updateModified(approvalId);
                     runApproval(approvalId);
+                } catch (Exception e) {
+                    log.error("Approval task failed, ticketId={}", approvalId, e);
                 } finally {
                     this.taskInQueueSet.remove(approvalId);
                 }
@@ -145,9 +173,11 @@ public class ApprovalTaskScheduler {
         if (executor == null || this.controlTaskInQueueSet == null) {
             return false;
         }
+
         if (!this.controlTaskInQueueSet.add(approvalId)) {
             return false;
         }
+
         try {
             executor.execute(() -> {
                 try {
@@ -168,6 +198,7 @@ public class ApprovalTaskScheduler {
         if (executor == null) {
             return;
         }
+
         try {
             executor.execute(task);
         } catch (RejectedExecutionException e) {
@@ -182,15 +213,32 @@ public class ApprovalTaskScheduler {
     }
 
     private void runApproval(Long approvalId) {
-        DmApprovalDO approvalDO = this.approvalDal.approvalMapper().queryById(approvalId);
-        String puid = approvalDO.getPrimaryUid();
-        DmApprovalDO afterCheck = this.approvalCheck(approvalDO, puid);
-        if (afterCheck == null) {
-            //            this.finishTask(FINISH_MSG);
+        DmApprovalDO approvalDO = this.approvalDal.approvalMapper().queryScheduleInfo(approvalId);
+        if (approvalDO == null || ApprovalStatus.isEndStatus(approvalDO.getTicketStatus())) {
             return;
         }
 
-        this.approvalDal.approvalMapper().updateModified(afterCheck.getId());
+        if (approvalDO.getTicketStatus() == ApprovalStatus.EXEC_FAIL
+            || (approvalDO.getTicketStatus() == ApprovalStatus.WAIT_APPROVAL && approvalDO.getApproType() == ApprovalType.Internal)) {
+            // Idle checks do not need the potentially large SQL payload.
+            DmApprovalDO checked = this.approvalCheck(approvalDO, approvalDO.getPrimaryUid());
+            if (checked != null && checked.getTicketStatus() == ApprovalStatus.WAIT_APPROVAL && checked.getApproTemplateIdentity() != null
+                && checked.getApproTemplateIdentity().startsWith(TEMPLATE_ID_PREFIX)) {
+                this.customApprovalService.startApproval(approvalId);
+            }
+            return;
+        }
+
+        approvalDO = this.approvalDal.approvalMapper().queryById(approvalId);
+        if (approvalDO == null) {
+            return;
+        }
+
+        String puid = approvalDO.getPrimaryUid();
+        DmApprovalDO afterCheck = this.approvalCheck(approvalDO, puid);
+        if (afterCheck == null) {
+            return;
+        }
 
         switch (afterCheck.getTicketStatus()) {
             case PRE_INIT_WAIT: {
@@ -205,8 +253,10 @@ public class ApprovalTaskScheduler {
                     String message = DmI18nUtils.getMessage(I18nRdpMsgKeys.TICKET_STATUS_EXPLAIN_FAILED_MESSAGE.name()) + rootException.getMessage();
                     this.approvalFlowService.failTicket(afterCheck.getId(), message, puid);
                 }
+
                 break;
             }
+
             case PRE_INIT_RUN: {
                 try {
                     this.taskProcessor.submitPreInitChildren(afterCheck, this::submitTask);
@@ -217,8 +267,10 @@ public class ApprovalTaskScheduler {
                     String message = DmI18nUtils.getMessage(I18nRdpMsgKeys.TICKET_STATUS_EXPLAIN_FAILED_MESSAGE.name()) + rootException.getMessage();
                     this.approvalFlowService.failTicket(afterCheck.getId(), message, puid);
                 }
+
                 break;
             }
+
             case WAIT_APPROVAL: {
                 try {
                     this.taskProcessor.processWaitApproval(afterCheck);
@@ -229,45 +281,64 @@ public class ApprovalTaskScheduler {
                     } else {
                         this.approvalFlowService.failTicket(approvalDO.getId(), DmI18nUtils.getMessage(e.getMessageKey(), e.getMessageArgs()), puid);
                     }
+
                     log.error(e.getMessage());
                 } catch (Exception e) {
                     this.approvalFlowService
                         .failTicket(approvalDO.getId(), DmI18nUtils.getMessage(I18nRdpMsgKeys.TICKET_APPROVAL_NOT_SUPPORT.name(), approvalDO.getApproType().name()), puid);
                     log.error("processWaitApproval failed msg:" + e.getMessage(), e);
                 }
+
                 break;
             }
+
             case WAIT_EXEC: {
                 try {
+                    if (afterCheck.getApproBiz() != ApprovalBiz.DATA_SOURCE_AUTH && customApprovalService.isCustomApproval(afterCheck)) {
+                        this.approvalControlService.prepareCustomExecutionJob(afterCheck.getId());
+                    }
+
                     this.taskProcessor.processWaitExec(afterCheck);
                 } catch (Exception e) {
                     log.error("processWaitApproval failed msg:" + e.getMessage(), e);
                 }
+
                 break;
             }
+
             case WAIT_CONFIRM: {
-                this.taskProcessor.processWaitConfirm(afterCheck);
+                if (customApprovalService.isCustomApproval(afterCheck) && customApprovalService.isAutomaticExecution(afterCheck)) {
+                    this.approvalControlService.startAutomaticExecution(afterCheck.getId());
+                } else {
+                    this.taskProcessor.processWaitConfirm(afterCheck);
+                }
+
                 break;
             }
+
             case RUNNING:
             case EXEC_PAUSE:
             case FAILED: {
                 this.taskProcessor.processRunningCheck(afterCheck);
                 break;
             }
+
             case REJECTED: {
                 this.taskProcessor.processReject(afterCheck);
                 break;
             }
+
             case CANCELED: {
                 this.taskProcessor.processCanceled(afterCheck);
                 break;
             }
+
             case EXEC_FAIL:
             case CLOSED:
             case FINISHED: {
                 break;
             }
+
             default:
                 String msg = "processWorker ticket status '" + afterCheck.getTicketStatus() + "' unsupport.";
                 log.error(msg);
@@ -277,6 +348,10 @@ public class ApprovalTaskScheduler {
 
     //
     private DmApprovalDO approvalCheck(DmApprovalDO ticketDO, String puid) {
+        if (ApprovalStatus.isEndStatus(ticketDO.getTicketStatus())) {
+            return null;
+        }
+
         DmDsDO dataSourceDO = this.dsService.queryById(ticketDO.getBindDsId());
         if ((dataSourceDO == null || dataSourceDO.getLifeCycleState() == LifeCycleState.DELETED) && ticketDO.getApproBiz() != ApprovalBiz.DATA_SOURCE_AUTH) {
             // ds is deleted
@@ -289,15 +364,11 @@ public class ApprovalTaskScheduler {
                                      ticketDO.getTicketStatus() == ApprovalStatus.PRE_INIT_RUN ||  //
                                      ticketDO.getTicketStatus() == ApprovalStatus.WAIT_APPROVAL;
         if (externalApproval && waitingForApproval) {
-            if (!this.approvalProviderServiceImpl.checkEnableApproval(puid, ticketDO.getApproType().getProviderType())) {
+            if (!this.approvalProviderServiceImpl.isApprovalConfigured(puid, ticketDO.getApproType().getProviderType())) {
                 String failMsg = DmI18nUtils.getMessage(I18nRdpMsgKeys.TICKET_APPROVAL_NOT_SUPPORT.name(), ticketDO.getApproType().name());
                 this.approvalFlowService.failTicket(ticketDO.getId(), failMsg, puid);
                 return null;
             }
-        }
-
-        if (ApprovalStatus.isEndStatus(ticketDO.getTicketStatus())) {
-            return null;
         }
 
         return ticketDO;

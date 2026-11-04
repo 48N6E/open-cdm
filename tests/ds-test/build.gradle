@@ -22,6 +22,7 @@ dependencies {
     testImplementation(project(':sql-postgres'))
     testImplementation(project(':sql-sqlserver'))
     testImplementation(project(':sql-doris'))
+    testImplementation(project(':sql-hana'))
     testImplementation(project(':sql-redis'))
     testImplementation(project(':sql-mongodb'))
     testImplementation(project(':sql-iso-sql92'))
@@ -33,11 +34,13 @@ dependencies {
     testImplementation(project(':ds-adb'))
     testImplementation(project(':ds-oceanbase'))
     testImplementation(project(':ds-tidb'))
+    testImplementation(project(':ds-goldendb'))
     testImplementation(project(':ds-postgres'))
     testImplementation(project(':ds-greenplum'))
     testImplementation(project(':ds-polardb'))
     testImplementation(project(':ds-oracle'))
     testImplementation(project(':ds-dameng'))
+    testImplementation(project(':ds-yashandb'))
     testImplementation(project(':ds-db2'))
     testImplementation(project(':ds-sqlserver'))
     testImplementation(project(':ds-hana'))
@@ -49,6 +52,7 @@ dependencies {
     testImplementation(project(':ds-redis'))
     testImplementation(project(':ds-valkey'))
     testImplementation(project(':ds-hologres'))
+    testImplementation(project(':ds-cockroachdb'))
     testImplementation(project(':ds-mongodb'))
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.13.4'
@@ -102,7 +106,7 @@ test {
         if (descriptor.parent == null) {
             startNanos.set(System.nanoTime())
             logger.lifecycle("[s-test] started: JUnit dynamic cases are registered during execution; " +
-                "progress shows completed, started, and currently running counts.")
+                    "progress shows completed, started, and currently running counts.")
 
             def threadFactory = { Runnable runnable ->
                 Thread thread = new Thread(runnable, 's-test-progress')
@@ -116,7 +120,7 @@ test {
                 long completed = completedCount.get()
                 long elapsedSeconds = java.util.concurrent.TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startNanos.get())
                 logger.lifecycle("[s-test] heartbeat: ${completed} completed, ${started} started, " +
-                    "${Math.max(0L, started - completed)} running, ${elapsedSeconds}s elapsed")
+                        "${Math.max(0L, started - completed)} running, ${elapsedSeconds}s elapsed")
             } as Runnable, heartbeatSeconds, heartbeatSeconds, java.util.concurrent.TimeUnit.SECONDS)
         }
     }
@@ -134,11 +138,11 @@ test {
         }
 
         if (completed == 1 || completed % progressInterval == 0 ||
-            result.resultType == org.gradle.api.tasks.testing.TestResult.ResultType.FAILURE) {
+                result.resultType == org.gradle.api.tasks.testing.TestResult.ResultType.FAILURE) {
             long started = startedCount.get()
             logger.lifecycle("[s-test] progress: ${completed} completed, ${started} started, " +
-                "${Math.max(0L, started - completed)} running, ${failedCount.get()} failed, " +
-                "${skippedCount.get()} skipped; latest: ${descriptor.className}.${descriptor.name}")
+                    "${Math.max(0L, started - completed)} running, ${failedCount.get()} failed, " +
+                    "${skippedCount.get()} skipped; latest: ${descriptor.className}.${descriptor.name}")
         }
     }
 
@@ -150,7 +154,7 @@ test {
             }
             long elapsedSeconds = java.util.concurrent.TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startNanos.get())
             logger.lifecycle("[s-test] finished: ${result.testCount} total, ${result.successfulTestCount} passed, " +
-                "${result.failedTestCount} failed, ${result.skippedTestCount} skipped, ${elapsedSeconds}s elapsed")
+                    "${result.failedTestCount} failed, ${result.skippedTestCount} skipped, ${elapsedSeconds}s elapsed")
         }
     }
 }

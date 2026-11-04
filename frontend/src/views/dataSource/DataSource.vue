@@ -45,7 +45,7 @@
             :aria-pressed="selectedAddDataSourceType === type.dsKey"
             @click="handleSelectAddDataSourceType(type.dsKey)"
           >
-            <span class="add-datasource-type-icon">
+            <span class="add-datasource-type-icon" :class="{ 'is-goldendb': ['GoldenDBMySQL', 'GoldenDBOracle'].includes(type.dsKey) }">
               <DataSourceIcon size="20px" :type="type.dsKey" leftMargin="0"></DataSourceIcon>
             </span>
             <span class="add-datasource-type-name" :title="type.displayName">{{ type.displayName }}</span>
@@ -77,17 +77,38 @@
             @update-search-key="handleUpdateSearchKey"
           ></DataSourceHeader>
           <div class="table-container data-source-container datasource-list-panel">
-            <Table size="small" border class="datasource-table" :columns="dataSourceColumn" :data="showData" :loading="refreshLoading">
+            <Table
+              size="small"
+              border
+              class="datasource-table"
+              :columns="dataSourceColumn"
+              :data="showData"
+              :loading="refreshLoading"
+              :scroll="{ x: 'max-content' }"
+            >
               <template #instanceId="{ row }">
                 <div class="datasource-identity">
-                  <DataSourceIcon class="datasource-type-icon" size="24px" :type="row.dataSourceType" :instanceType="row.deployType"></DataSourceIcon>
+                  <DataSourceIcon
+                    class="datasource-type-icon"
+                    size="24px"
+                    :type="row.dataSourceType"
+                    :instanceType="row.deployType"
+                    leftMargin="0"
+                  ></DataSourceIcon>
                   <div class="datasource-info-text">
                     <div class="datasource-main-info">
-                      <Tooltip :content="row.instanceDesc || $t('zan-wu-miao-shu')" placement="bottom" transfer>
+                      <Poptip
+                        :content="row.instanceId"
+                        :disabled="!row.instanceId"
+                        trigger="hover"
+                        placement="bottom"
+                        transfer
+                        popper-class="description-popup"
+                      >
                         <span class="datasource-primary-content datasource-name">
                           {{ row.instanceDesc || $t('zan-wu-miao-shu') }}
                         </span>
-                      </Tooltip>
+                      </Poptip>
                       <CustomIcon
                         class="iconfont icon datasource-edit-icon"
                         v-if="myAuth.includes('RDP_DS_MANAGE') || myAuth.includes('RDP_ALL_DATASOURCE_MANAGE')"
@@ -103,42 +124,25 @@
                       >
                         <span class="datasource-creating-indicator"></span>
                       </Tooltip>
-                      <div>
-                        <Tooltip
-                          placement="right"
-                          class="alarm-icon"
-                          transfer
-                          :content="$t('cun-zai-yi-chang-de-hou-tai-ren-wu-qing-dian-ji-chu-li')"
-                          v-if="row.consoleTaskState === 'FAILED'"
-                        >
-                          <span style="display: inline-block; margin-left: 6px" @click="handleGoConsoleJob(row)">
-                            <i class="iconfont iconyibuforce"></i>
-                          </span>
-                        </Tooltip>
-                      </div>
-                    </div>
-                    <div class="data-job-desc datasource-secondary-content datasource-id-text">
-                      {{ row.instanceId }}
                     </div>
                   </div>
                 </div>
               </template>
               <template #action="{ row }">
-                <div v-if="canManageDataSource" class="datasource-action-group">
+                <div v-if="canManageDataSource" class="table-row-actions">
                   <Button
-                    class="datasource-action-button datasource-action-test"
                     type="text"
                     size="small"
-                    :loading="testingDataSourceId === row.id"
-                    :disabled="row.lifeCycleState !== 'CREATED' || testingDataSourceId !== null"
+                    :loading="testingDataSourceIds.has(row.id)"
+                    :disabled="row.lifeCycleState !== 'CREATED' || testingDataSourceIds.has(row.id)"
                     @click="handleTestConnection(row)"
                   >
                     {{ $t('ce-shi') }}
                   </Button>
-                  <Button class="datasource-action-button" type="text" size="small" @click="handleKvConfigs(row)">
+                  <Button type="text" size="small" @click="handleKvConfigs(row)">
                     {{ $t('bian-ji') }}
                   </Button>
-                  <Button type="text" size="small" class="datasource-action-button datasource-action-danger" @click="handleDeleteConfirm(row)">
+                  <Button type="text" size="small" @click="handleDeleteConfirm(row)">
                     {{ $t('shan-chu') }}
                   </Button>
                 </div>
@@ -150,9 +154,16 @@
               </template>
               <template #instanceDesc="{ row }">
                 <div style="position: relative">
-                  <Tooltip :content="row.instanceDesc" placement="right" transfer>
+                  <Poptip
+                    :content="row.instanceDesc"
+                    :disabled="!row.instanceDesc"
+                    trigger="hover"
+                    placement="right"
+                    transfer
+                    popper-class="description-popup"
+                  >
                     <span class="datasource-desc-content">{{ row.instanceDesc }}</span>
-                  </Tooltip>
+                  </Poptip>
                   <CustomIcon
                     type="icon-v2-EditSimple"
                     size="13px"
@@ -469,7 +480,7 @@ export default {
     return {
       showDeleteAccountModal: false,
       dsKvConfigs: [],
-      testingDataSourceId: null,
+      testingDataSourceIds: new Set(),
       securitySetting: [],
       securitySettingObj: {},
       sid: '',
@@ -583,6 +594,12 @@ export default {
           minWidth: 420
         },
         {
+          title: this.$t('huan-jing'),
+          key: 'dsEnvName',
+          minWidth: 160,
+          tooltip: true
+        },
+        {
           title: this.$t('wang-luo-di-zhi'),
           key: 'host',
           minWidth: 320,
@@ -642,7 +659,7 @@ export default {
     };
   },
   computed: {
-    ...mapState(['productClusterList', 'myAuth']),
+    ...mapState(['myAuth']),
     ...mapState(['globalDsSetting', 'dmGlobalSetting']),
     ...mapGetters(['isDesktop']),
     SECOND_CONFIRM_EVENT_LIST() {
@@ -1052,7 +1069,11 @@ export default {
       });
     },
     async handleTestConnection(row) {
-      this.testingDataSourceId = row.id;
+      if (this.testingDataSourceIds.has(row.id)) {
+        return;
+      }
+
+      this.testingDataSourceIds.add(row.id);
       try {
         const res = await this.$services.dmDataSourceTestConnect({
           data: {
@@ -1067,7 +1088,7 @@ export default {
       } catch (e) {
         this.$Message.error(e?.message || this.$t('ce-shi-lian-jie-shi-bai'));
       } finally {
-        this.testingDataSourceId = null;
+        this.testingDataSourceIds.delete(row.id);
       }
     },
     resetAccountInfo() {
@@ -1091,9 +1112,6 @@ export default {
         accessKey: '',
         secretKey: ''
       };
-    },
-    handleGoConsoleJob(row) {
-      this.$router.push({ path: `/ccsystem/state/task/${row.consoleJobId}` });
     },
     handleChangeSearchType() {
       // Reset all search values when switching query type
@@ -1215,13 +1233,14 @@ export default {
 
 .add-datasource-type-search {
   width: 320px;
+  max-width: 100%;
   flex: 0 0 auto;
 }
 
 .add-datasource-type-grid {
   display: grid;
   flex: 1 1 auto;
-  grid-template-columns: repeat(auto-fill, minmax(138px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-content: start;
   gap: 10px;
   min-height: 0;
@@ -1233,6 +1252,14 @@ export default {
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  @media (max-width: 767px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 479px) {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1273,6 +1300,11 @@ export default {
   flex: 0 0 20px;
   align-items: center;
   justify-content: center;
+
+  &.is-goldendb {
+    width: 40px;
+    flex-basis: 40px;
+  }
 }
 
 .add-datasource-type-name {
@@ -1313,9 +1345,9 @@ export default {
 }
 
 .datasource-type-icon {
-  display: inline-flex;
-  width: 28px;
-  flex: 0 0 28px;
+  display: inline-flex !important;
+  width: 48px;
+  flex: 0 0 48px !important;
   align-items: center;
   justify-content: center;
 }
@@ -1327,13 +1359,6 @@ export default {
 .datasource-name {
   font-size: 14px;
   font-weight: 500;
-}
-
-.datasource-id-text {
-  max-width: 320px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .datasource-edit-icon {
@@ -1423,50 +1448,6 @@ export default {
 
 .job-list-source {
   left: -10px;
-}
-
-.data-job-desc {
-  .iconfont {
-    visibility: hidden;
-  }
-
-  &:hover .iconfont {
-    visibility: visible;
-  }
-}
-
-.datasource-action-group {
-  display: flex;
-  align-items: center;
-  min-width: 112px;
-  gap: 4px;
-  justify-content: flex-start;
-  white-space: nowrap;
-
-  :deep(.ivu-btn-text) {
-    height: 28px;
-    padding: 0 2px;
-    font-weight: 500;
-  }
-}
-
-.datasource-action-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-}
-
-.datasource-action-test {
-  min-width: 44px;
-
-  :deep(.ivu-load-loop) {
-    margin-right: 2px;
-  }
-}
-
-.datasource-action-danger {
-  color: #ed4014;
 }
 
 .delete-datasource-confirm-tip {

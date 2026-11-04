@@ -187,15 +187,11 @@ public class RootUserConfig {
     @UserConfigDef(name = "updateApprovalStatusIntervalTime", descKey = I18nUserConfigMsgKeys.APPROVAL_UPDATE_INTERVAL_TIME, defaultValue = "86400", configTagType = UserConfigTagType.COMMON, confBelong = ConfBelong.Common, valueRange = "0 - 2592000")
     private String        updateApprovalStatusIntervalTime;
     //
-    @UserConfigDef(name = "dingEnableApprovalService", defaultValue = "false", descKey = I18nUserConfigMsgKeys.DING_ENABLE_APPROVAL_SERVICE, configTagType = UserConfigTagType.DINGTALK, confBelong = ConfBelong.Common, kvConfWebOp = ConfigValType.BOOLEAN)
-    private String        dingEnableApprovalService;
     @UserConfigDef(name = "dingApprovalConfigAk", descKey = I18nUserConfigMsgKeys.DING_CONFIG_APPROVAL_AK, configTagType = UserConfigTagType.DINGTALK, confBelong = ConfBelong.Common)
     private String        dingApprovalConfigAk;
     @UserConfigDef(name = "dingApprovalConfigSk", descKey = I18nUserConfigMsgKeys.DING_CONFIG_APPROVAL_SK, configTagType = UserConfigTagType.DINGTALK, confBelong = ConfBelong.Common)
     private String        dingApprovalConfigSk;
     //
-    @UserConfigDef(name = "feishuEnableApprovalService", defaultValue = "false", descKey = I18nUserConfigMsgKeys.FEISHU_ENABLE_APPROVAL_SERVICE, configTagType = UserConfigTagType.FEISHU, confBelong = ConfBelong.Common, kvConfWebOp = ConfigValType.BOOLEAN)
-    private String        feishuEnableApprovalService;
     @UserConfigDef(name = "feishuApprovalAppID", descKey = I18nUserConfigMsgKeys.FEISHU_CONFIG_APPROVAL_APP_ID, configTagType = UserConfigTagType.FEISHU, confBelong = ConfBelong.Common)
     private String        feishuApprovalAppID;
     @UserConfigDef(name = "feishuApprovalAppSecret", descKey = I18nUserConfigMsgKeys.FEISHU_CONFIG_APPROVAL_APP_SECRET, configTagType = UserConfigTagType.FEISHU, confBelong = ConfBelong.Common)
@@ -205,8 +201,6 @@ public class RootUserConfig {
     @UserConfigDef(name = "feishuApprovalTemplateList", descKey = I18nUserConfigMsgKeys.FEISHU_CONFIG_APPROVAL_TEMPLATE_CODE, configTagType = UserConfigTagType.FEISHU, confBelong = ConfBelong.Common)
     private String        feishuApprovalTemplateList;
     //
-    @UserConfigDef(name = "wechatEnableApprovalService", defaultValue = "false", descKey = I18nUserConfigMsgKeys.WECHAT_ENABLE_APPROVAL_SERVICE, configTagType = UserConfigTagType.WECHAT, confBelong = ConfBelong.Common, kvConfWebOp = ConfigValType.BOOLEAN)
-    private String        wechatEnableApprovalService;
     @UserConfigDef(name = "wechatApprovalCorpId", descKey = I18nUserConfigMsgKeys.WECHAT_APPROVAL_CORP_ID, configTagType = UserConfigTagType.WECHAT, confBelong = ConfBelong.Common)
     private String        wechatApprovalCorpId;
     @UserConfigDef(name = "wechatApprovalSecret", descKey = I18nUserConfigMsgKeys.WECHAT_APPROVAL_SECRET, configTagType = UserConfigTagType.WECHAT, confBelong = ConfBelong.Common)
@@ -265,8 +259,8 @@ public class RootUserConfig {
 
     @UserConfigDef(name = "onlineSelectRewriteDisable", defaultValue = "false", valueRange = "true, false", descKey = I18nUserConfigMsgKeys.SQL_RESULT_SELECT_REWRITE_DISABLE, configTagType = UserConfigTagType.QUERY_RESULT, confBelong = ConfBelong.CloudDM)
     private Boolean       onlineSelectRewriteDisable;
-    @UserConfigDef(name = "onlineResultCacheTimeoutSec", defaultValue = "300", valueRange = "0 ~ 43200", descKey = I18nUserConfigMsgKeys.SQL_RESULT_CACHE_TIMEOUT_SEC, configTagType = UserConfigTagType.QUERY_RESULT, confBelong = ConfBelong.CloudDM)
-    private Integer       onlineResultCacheTimeoutSec;
+    @UserConfigDef(name = "onlineResultCacheCapacityMegaByte", defaultValue = "1024", valueRange = "0 ~ 1048576 MB", descKey = I18nUserConfigMsgKeys.SQL_RESULT_CACHE_CAPACITY_MB, configTagType = UserConfigTagType.QUERY_RESULT, confBelong = ConfBelong.CloudDM)
+    private Integer       onlineResultCacheCapacityMegaByte;
     //
     @UserConfigDef(name = "onlineMaxRecordCount", defaultValue = "1000", valueRange = "1 ~ 1000000, default 10000 records.", descKey = I18nUserConfigMsgKeys.SQL_RESULT_ONLINE_MAX_RECORD_COUNT, configTagType = UserConfigTagType.QUERY_RESULT, confBelong = ConfBelong.CloudDM)
     private Integer       onlineMaxRecordCount;

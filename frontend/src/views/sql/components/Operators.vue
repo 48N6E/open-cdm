@@ -39,6 +39,7 @@
               <span>{{ $t('ge-shi') }}</span>
             </div>
           </Button>
+          <slot name="assistant-control" />
         </div>
         <div class="operator-btn-group" v-if="isSupportTx || isSupportIsolation || isSupportReadOnly">
           <Button size="small" v-if="isSupportIsolation">
@@ -96,7 +97,7 @@
           <Button size="small" v-if="showTxActions" @click="handleRollback">
             {{ $t('hui-gun') }}
           </Button>
-          <Button size="small" v-if="isSupportReadOnly" class="readonly-operator-btn" @click="handleReadOnlyClick">
+          <Button size="small" v-if="isSupportReadOnly" :disabled="!tab.connected" class="readonly-operator-btn" @click="handleReadOnlyClick">
             <Checkbox :model-value="tab.readOnly">
               {{ $t('zhi-du') }}
             </Checkbox>
@@ -110,6 +111,7 @@
   </div>
 </template>
 <script>
+import { canFormatSql } from '@/components/editor/sqlFormat';
 import appLogger from '@/utils/logger';
 import { mapGetters, mapState } from 'vuex';
 import browseMixin from '@/mixins/browseMixin';
@@ -160,7 +162,7 @@ export default {
       return this.tab.support.explain.conf !== 'No';
     },
     isSupportFormat() {
-      return false;
+      return canFormatSql(this.tab);
     },
     isRunning() {
       return this.tab.stopping || this.tab.running || !this.socket.connected || !this.tab.connected;
@@ -201,7 +203,7 @@ export default {
       }
     },
     handleSetInitTx() {
-      if (this.tab.support.autoCommit.conf === 'Allow' && this.tab.sessionId) {
+      if (this.tab.connected && this.tab.support.autoCommit.conf === 'Allow' && this.tab.sessionId) {
         this.handleSetTx(this.tab.autoCommit);
       }
     },
@@ -282,6 +284,33 @@ export default {
   :deep(.ivu-checkbox-wrapper) {
     margin-right: 0;
     pointer-events: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .operators {
+    height: auto;
+    flex-basis: auto;
+    min-height: 44px;
+
+    .operator-character {
+      flex-wrap: wrap;
+      gap: 8px;
+
+      .left {
+        flex-wrap: wrap;
+        flex-shrink: 1;
+      }
+
+      .right {
+        flex-basis: 100%;
+        margin-left: 0;
+      }
+    }
+  }
+
+  .operator-btn-group {
+    flex-wrap: wrap;
   }
 }
 </style>

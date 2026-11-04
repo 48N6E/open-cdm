@@ -1,4 +1,21 @@
+/*
+ * Copyright 2026 杭州开云集致科技有限公司
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.clougence.sql.mysql.parser.antlr;
+
+import java.util.Locale;
 
 import org.antlr.v4.runtime.*;
 
@@ -20,7 +37,7 @@ public abstract class MySqlLexerBase extends Lexer {
     @Override
     public Token nextToken() {
         Token token;
-        if (exactVersion() >= 80100 && _input.LA(1) == '$' && !isImmediatelyAfterDot(_input.index())) {
+        if (!config.isMariaDb() && exactVersion() >= 80100 && _input.LA(1) == '$' && !isImmediatelyAfterDot(_input.index())) {
             int delimiterLength = dollarQuoteDelimiterLength();
             int tokenLength = delimiterLength == 0 ? 0 : dollarQuoteTokenLength(delimiterLength);
             if (delimiterLength > 0) {
@@ -63,7 +80,7 @@ public abstract class MySqlLexerBase extends Lexer {
         if (text == null) {
             return false;
         }
-        return switch (text.toUpperCase(java.util.Locale.ROOT)) {
+        return switch (text.toUpperCase(Locale.ROOT)) {
             case "ADDDATE", "BIT_AND", "BIT_OR", "BIT_XOR", "CAST", "COUNT", "CURDATE", "CURTIME", "DATE_ADD", "DATE_SUB", "EXTRACT", "GROUP_CONCAT", "JSON_ARRAYAGG",
                     "JSON_DUALITY_OBJECT", "JSON_OBJECTAGG", "MAX", "MID", "MIN", "NOW", "POSITION", "PI", "SESSION_USER", "STD", "STDDEV", "STDDEV_POP", "STDDEV_SAMP",
                     "ST_COLLECT", "SUBDATE", "SUBSTR", "SUBSTRING", "SUM", "SYSDATE", "SYSTEM_USER", "TRIM", "VARIANCE", "VAR_POP", "VAR_SAMP" ->
@@ -80,8 +97,11 @@ public abstract class MySqlLexerBase extends Lexer {
     }
 
     private boolean isTokenAllowed(Token token) {
+        if (config.isMariaDb() && token.getType() == MySqlLexer.VECTOR) {
+            return config.exactVersion() == 0 || config.exactVersion() >= 110701;
+        }
         return switch (token.getType()) {
-            case MySqlLexer.ANALYSE, MySqlLexer.REDOFILE, MySqlLexer.SQL_CACHE -> atMost(5, 7);
+            case MySqlLexer.ANALYSE, MySqlLexer.REDOFILE, MySqlLexer.SQL_CACHE -> config.isMariaDb() || atMost(5, 7);
             case MySqlLexer.OLD_PASSWORD -> atMost(5, 6);
             case MySqlLexer.MASTER_BIND, MySqlLexer.MASTER_SSL_VERIFY_SERVER_CERT -> atMost(8, 0);
             case MySqlLexer.COMPONENT, MySqlLexer.CLONE, MySqlLexer.EXCEPT, MySqlLexer.EXCLUDE, MySqlLexer.GROUPS, MySqlLexer.GROUPING, MySqlLexer.INTERSECT, MySqlLexer.LATERAL,

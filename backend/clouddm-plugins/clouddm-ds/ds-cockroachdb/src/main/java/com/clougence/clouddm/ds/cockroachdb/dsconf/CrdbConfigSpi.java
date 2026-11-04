@@ -29,7 +29,6 @@ import com.clougence.clouddm.base.metadata.ui.form.UiPanel;
 import com.clougence.clouddm.base.metadata.ui.form.UiPanelField;
 import com.clougence.clouddm.dsfamily.postgres.dsconf.AbstractPgConfigSpi;
 import com.clougence.drivers.adapter.ConvertUtils;
-import com.clougence.utils.StringUtils;
 
 public class CrdbConfigSpi extends AbstractPgConfigSpi {
 
@@ -48,16 +47,8 @@ public class CrdbConfigSpi extends AbstractPgConfigSpi {
         CrdbConfig config = (CrdbConfig) dsConfig;
         Long connectTimeoutMs = ConvertUtils.toLong(defaultConfig.get(CrdbConfig.Fields.connectTimeoutMs), false);
         Integer soTimeoutSec = ConvertUtils.toInteger(defaultConfig.get(CrdbConfig.Fields.soTimeoutSec), false);
-        String defaultCatalog = defaultConfig.get(CrdbConfig.Fields.defaultCatalog);
-        if (StringUtils.isBlank(defaultCatalog)) {
-            defaultCatalog = "defaultdb";
-        }
-        String defaultSchema = defaultConfig.get(CrdbConfig.Fields.defaultSchema);
-        if (StringUtils.isBlank(defaultSchema)) {
-            defaultSchema = "public";
-        }
-        config.setDefaultCatalog(defaultCatalog);
-        config.setDefaultSchema(defaultSchema);
+        config.setDefaultCatalog(defaultConfig.get(CrdbConfig.Fields.defaultCatalog));
+        config.setDefaultSchema(defaultConfig.get(CrdbConfig.Fields.defaultSchema));
         config.setConnectTimeoutMs(connectTimeoutMs == null ? 5000L : connectTimeoutMs);
         config.setSoTimeoutSec(soTimeoutSec == null ? 10 : soTimeoutSec);
         config.setClientTimeZone(defaultConfig.get(CrdbConfig.Fields.clientTimeZone));

@@ -13,8 +13,15 @@
     <driver driverFamily="MySQL Connector/J" version="8.4.0">
         <resource type="maven">com.mysql:mysql-connector-j:8.4.0</resource>
     </driver>
+    <!-- YashanDB MySQL-compatible variant: standard MySQL protocol port, same Connector/J artifact. -->
+    <driver driverFamily="YashanDB MySQL JDBC Driver" version="8.4.0">
+        <resource type="maven">com.mysql:mysql-connector-j:8.4.0</resource>
+    </driver>
     <driver driverFamily="PostgreSQL JDBC" version="42.7.10">
         <resource type="maven">org.postgresql:postgresql:42.7.10</resource>
+    </driver>
+    <driver driverFamily="KingbaseES JDBC Driver" version="9.0.1">
+        <resource type="maven">cn.com.kingbase:kingbase8:9.0.1</resource>
     </driver>
     <driver driverFamily="MariaDB Java Client" version="3.5.8">
         <resource type="maven">org.mariadb.jdbc:mariadb-java-client:3.5.8</resource>

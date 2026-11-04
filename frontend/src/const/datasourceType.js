@@ -16,7 +16,7 @@ export const REDIS = ['Redis', 'Valkey'];
 export const KUDU = ['Kudu'];
 export const CK = ['ClickHouse'];
 export const MONGO = ['MongoDB'];
-export const NO_DB = ['Kafka', 'RocketMQ', 'RabbitMQ', 'MongoDB', 'Redis', 'Valkey', 'ElasticSearch'];
+export const NO_DB = ['Kafka', 'RocketMQ', 'RabbitMQ', 'MongoDB', 'Redis', 'Valkey', 'ElasticSearch', 'Etcd'];
 
 export default {
   MYSQL,

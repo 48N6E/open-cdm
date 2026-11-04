@@ -85,37 +85,57 @@ public class ChangeApprovalHandler implements ApprovalHandler {
     @Transactional(rollbackFor = Throwable.class, propagation = Propagation.REQUIRED)
     public void executeTicket(long approvalId, ApprovalBiz bizType, ImSenderService sender) {
         DmApprovalDO ticketDO = this.approvalDal.approvalMapper().queryById(approvalId);
+        if (ticketDO == null || ticketDO.getDeleted() || ApprovalStatus.isEndStatus(ticketDO.getTicketStatus())) {
+            return;
+        }
+
         DmExecAutoJobDO jobDO = this.execDal.autoJobMapper().queryByDependOnBizId(ticketDO.getBizId());
         if (jobDO == null) {
             return;
         }
 
-        this.updateExecutionStatus(approvalId, jobDO.getStatus(), sender);
+        this.updateExecutionStatus(ticketDO, jobDO.getStatus(), sender);
     }
 
     @Override
     @Transactional(rollbackFor = Throwable.class, propagation = Propagation.REQUIRED)
     public void runningCheck(long approvalId, ApprovalBiz bizType, ImSenderService sender) {
         DmApprovalDO ticketDO = this.approvalDal.approvalMapper().queryById(approvalId);
+        if (ticketDO == null || ticketDO.getDeleted() || ApprovalStatus.isEndStatus(ticketDO.getTicketStatus())) {
+            return;
+        }
+
         DmExecAutoJobDO jobDO = this.execDal.autoJobMapper().queryByDependOnBizId(ticketDO.getBizId());
-        this.updateExecutionStatus(approvalId, jobDO.getStatus(), sender);
+        this.updateExecutionStatus(ticketDO, jobDO.getStatus(), sender);
     }
 
-    private void updateExecutionStatus(long approvalId, AutoExecJobStatus status, ImSenderService sender) {
+    private void updateExecutionStatus(DmApprovalDO ticketDO, AutoExecJobStatus status, ImSenderService sender) {
+        long approvalId = ticketDO.getId();
         switch (status) {
             case FINISH -> {
                 this.approvalStateService.updateProcessStatus(approvalId, ApprovalStage.EXECUTION, ApprovalProcessStatus.FINISH, null);
                 this.approvalStateService.updateApprovalStatus(approvalId, ApprovalStatus.FINISHED, null);
                 this.approvalCompleted(approvalId, ApprovalBiz.DM_CHANGE, sender);
             }
+
             case FAILED -> {
+                if (ticketDO.getTicketStatus() == ApprovalStatus.EXEC_FAIL) {
+                    return;
+                }
+
                 this.approvalStateService.updateProcessStatus(approvalId, ApprovalStage.EXECUTION, ApprovalProcessStatus.FAIL, null);
                 this.approvalStateService.updateApprovalStatus(approvalId, ApprovalStatus.EXEC_FAIL, null);
             }
+
             case PAUSE -> {
+                if (ticketDO.getTicketStatus() == ApprovalStatus.EXEC_PAUSE) {
+                    return;
+                }
+
                 this.approvalStateService.updateProcessStatus(approvalId, ApprovalStage.EXECUTION, ApprovalProcessStatus.PAUSE, null);
                 this.approvalStateService.updateApprovalStatus(approvalId, ApprovalStatus.EXEC_PAUSE, null);
             }
+
             default -> {
                 // Execution progress states are synchronized by execution callbacks.
             }
@@ -184,14 +204,13 @@ public class ChangeApprovalHandler implements ApprovalHandler {
         if (createInstance.getApprovalUrl() != null) {
             url = JsonUtils.toJson(createInstance.getApprovalUrl());
         }
+
         approvalDal.approvalMapper().updateThirdApprovalInfo(ticketDO.getId(), createInstance.getApprovalIdentity(), url);
     }
 
     @Override
     public void approvalCompleted(long approvalId, ApprovalBiz bizType, ImSenderService sender) {
-        this.updateChange(approvalId, ChangeStep.FINISH, ChangeStatus.READY, sender, (ticket, change, locale) -> {
-            return DmI18nUtils.getMessage(I18nDmMsgKeys.CICD_CHANGE_TICKET_FINISH_MESSAGE.name(), locale, change.getChangeName());
-        });
+        this.updateChange(approvalId, ChangeStep.FINISH, ChangeStatus.READY, sender, I18nDmMsgKeys.CICD_CHANGE_TICKET_FINISH_MESSAGE);
     }
 
     @Override
@@ -201,26 +220,20 @@ public class ChangeApprovalHandler implements ApprovalHandler {
 
     @Override
     public void approvalRejected(long approvalId, ApprovalBiz bizType, ImSenderService sender) {
-        this.updateChange(approvalId, ChangeStep.APPROVAL, ChangeStatus.FAILED, sender, (ticket, change, locale) -> {
-            return DmI18nUtils.getMessage(I18nDmMsgKeys.CICD_CHANGE_TICKET_REFUSE_MESSAGE.name(), locale, change.getChangeName());
-        });
+        this.updateChange(approvalId, ChangeStep.APPROVAL, ChangeStatus.FAILED, sender, I18nDmMsgKeys.CICD_CHANGE_TICKET_REFUSE_MESSAGE);
     }
 
     @Override
     public void approvalFailed(long approvalId, ApprovalBiz bizType, ImSenderService sender) {
-        this.updateChange(approvalId, ChangeStep.APPROVAL, ChangeStatus.FAILED, sender, (ticket, change, locale) -> {
-            return DmI18nUtils.getMessage(I18nDmMsgKeys.CICD_CHANGE_TICKET_FAILED_MESSAGE.name(), locale, change.getChangeName());
-        });
+        this.updateChange(approvalId, ChangeStep.APPROVAL, ChangeStatus.FAILED, sender, I18nDmMsgKeys.CICD_CHANGE_TICKET_FAILED_MESSAGE);
     }
 
     @Override
     public void approvalCanceled(long approvalId, ApprovalBiz bizType, ImSenderService sender) {
-        this.updateChange(approvalId, ChangeStep.APPROVAL, ChangeStatus.FAILED, sender, (ticket, change, locale) -> {
-            return DmI18nUtils.getMessage(I18nDmMsgKeys.CICD_CHANGE_TICKET_CANCELED_MESSAGE.name(), locale, change.getChangeName());
-        });
+        this.updateChange(approvalId, ChangeStep.APPROVAL, ChangeStatus.FAILED, sender, I18nDmMsgKeys.CICD_CHANGE_TICKET_CANCELED_MESSAGE);
     }
 
-    private void updateChange(long approvalId, ChangeStep changeStep, ChangeStatus changeStatus, ImSenderService sender, ChangeMessageFunction changeMessage) {
+    private void updateChange(long approvalId, ChangeStep changeStep, ChangeStatus changeStatus, ImSenderService sender, I18nDmMsgKeys messageKey) {
         DmApprovalDO ticketDO = this.approvalDal.approvalMapper().queryById(approvalId);
         ApprovalMO info = JsonUtils.toObj(ticketDO.getTicketInfo(), ApprovalMO.class);
         if (info == null || info.getChangeOwnerUid() == null || info.getChangeId() == null) {
@@ -233,6 +246,7 @@ public class ChangeApprovalHandler implements ApprovalHandler {
         if (item == null || StringUtils.isBlank(item.getContent())) {
             return;
         }
+
         ChangeTicketInfo ticketInfo = JsonUtils.toObj(item.getContent(), ChangeTicketInfo.class);
         if (ticketInfo == null || approvalId != ticketInfo.getTicketId()) {
             return; // maybe restart flow.
@@ -241,7 +255,7 @@ public class ChangeApprovalHandler implements ApprovalHandler {
         //
         String language = sender.getFlowLanguage(changeDO.getOwnerUid(), changeDO.getRefFlowId());
         Locale locale = I18nUtils.getLocale(language);
-        String changeMessageStr = changeMessage.apply(ticketDO, changeDO, locale);
+        String changeMessageStr = DmI18nUtils.getMessage(messageKey.name(), locale, changeDO.getChangeName());
 
         // send message
         ImMessageType sendMessageAndType = null;
@@ -250,13 +264,16 @@ public class ChangeApprovalHandler implements ApprovalHandler {
             if (this.changeFlowDal.changeMapper().updateStepTo(changeDO.getId(), version, changeStep, changeMessageStr) != 1) {
                 throw new IllegalStateException("change state changed while applying approval step");
             }
+
             version++;
             sendMessageAndType = ImMessageType.ChangeLife;
         }
+
         if (changeDO.getCurrentStatus() != changeStatus) {
             if (this.changeFlowDal.changeMapper().updateStatusTo(changeDO.getId(), version, changeStatus, changeMessageStr) != 1) {
                 throw new IllegalStateException("change state changed while applying approval status");
             }
+
             sendMessageAndType = ImMessageType.ChangeNotice;
         }
 
@@ -265,8 +282,10 @@ public class ChangeApprovalHandler implements ApprovalHandler {
             if (this.changeFlowDal.changeMapper().lockChangeById(updated.getId(), updated.getVersion()) != 1) {
                 throw new IllegalStateException("change state changed while locking terminal approval change");
             }
+
             this.changeCascadeService.onChangeTerminal(updated);
         }
+
         if (sendMessageAndType != null) {
             sender.sendMessage(changeDO.getOwnerUid(), changeDO.getRefFlowId(), sendMessageAndType, changeMessageStr);
         }
@@ -296,8 +315,4 @@ public class ChangeApprovalHandler implements ApprovalHandler {
         return form;
     }
 
-    private interface ChangeMessageFunction {
-
-        String apply(DmApprovalDO ticket, DmChangeDO change, Locale locale);
-    }
 }
