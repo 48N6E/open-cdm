@@ -153,49 +153,49 @@
                       </template>
                     </KafkaConsole>
                     <template v-else>
-                    <div class="layout-content-main">
-                      <SqlViewer
-                        v-if="currentTab.support"
-                        ref="sqlViewer"
-                        :handleGetDsSetting="handleGetDsSetting"
-                        :createSession="createSession"
-                        :storeQueryTabs="storeQueryTabs"
-                        :tab="currentTab"
-                        :tabs="tabs"
-                        :completion-data="completionData"
-                        :rdb-object-detail="rdbObjectDetail"
-                        :handle-click-ds-status-icon="handleClickDsStatusIcon"
-                        @switch-tab="handleChangeTab"
-                        @workspace-connection-error="handleWorkspaceConnectionError"
-                        @workspace-connection-success="handleWorkspaceConnectionSuccess"
-                        @open-script="handleOpenSqlScript"
-                      >
-                        <template #connection-context>
-                          <div v-if="currentTab.connected && currentTab.node" class="query-schema-select__content">
-                            <a-select
-                              v-if="currentTab.selectOptions && currentTab.node.levels[currentTab.node.levels.length - 1] !== 'INSTANCE'"
-                              class="schema-select-style"
-                              v-model:value="currentTab.selectValue"
-                              show-search
-                              size="small"
-                              :options="currentTab.selectOptions || []"
-                              @select="handleChangeSchema"
-                            ></a-select>
-                            <CustomIcon
-                              class="query-connection-icon"
-                              :type="currentTab.dsType"
-                              :instance-type="currentTab.node.INSTANCE.attr.dsDeployType"
-                              size="14px"
-                              aria-hidden="true"
-                            />
-                            <div class="query-connection-label">@{{ currentTab.node.INSTANCE.attr.dsHost }}</div>
-                          </div>
-                        </template>
-                      </SqlViewer>
-                    </div>
-                    <div ref="result" class="result-wrapper">
-                      <Result :id="`result_${currentTab.key}`" :ref="`result_`" :resultList="currentTab.resultList" :tab="currentTab" />
-                    </div>
+                      <div class="layout-content-main">
+                        <SqlViewer
+                          v-if="currentTab.support"
+                          ref="sqlViewer"
+                          :handleGetDsSetting="handleGetDsSetting"
+                          :createSession="createSession"
+                          :storeQueryTabs="storeQueryTabs"
+                          :tab="currentTab"
+                          :tabs="tabs"
+                          :completion-data="completionData"
+                          :rdb-object-detail="rdbObjectDetail"
+                          :handle-click-ds-status-icon="handleClickDsStatusIcon"
+                          @switch-tab="handleChangeTab"
+                          @workspace-connection-error="handleWorkspaceConnectionError"
+                          @workspace-connection-success="handleWorkspaceConnectionSuccess"
+                          @open-script="handleOpenSqlScript"
+                        >
+                          <template #connection-context>
+                            <div v-if="currentTab.connected && currentTab.node" class="query-schema-select__content">
+                              <a-select
+                                v-if="currentTab.selectOptions && currentTab.node.levels[currentTab.node.levels.length - 1] !== 'INSTANCE'"
+                                class="schema-select-style"
+                                v-model:value="currentTab.selectValue"
+                                show-search
+                                size="small"
+                                :options="currentTab.selectOptions || []"
+                                @select="handleChangeSchema"
+                              ></a-select>
+                              <CustomIcon
+                                class="query-connection-icon"
+                                :type="currentTab.dsType"
+                                :instance-type="currentTab.node.INSTANCE.attr.dsDeployType"
+                                size="14px"
+                                aria-hidden="true"
+                              />
+                              <div class="query-connection-label">@{{ currentTab.node.INSTANCE.attr.dsHost }}</div>
+                            </div>
+                          </template>
+                        </SqlViewer>
+                      </div>
+                      <div ref="result" class="result-wrapper">
+                        <Result :id="`result_${currentTab.key}`" :ref="`result_`" :resultList="currentTab.resultList" :tab="currentTab" />
+                      </div>
                     </template>
                   </div>
                 </div>

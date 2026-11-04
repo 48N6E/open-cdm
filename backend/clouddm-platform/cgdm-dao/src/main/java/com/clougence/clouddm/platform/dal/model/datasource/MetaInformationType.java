@@ -61,19 +61,16 @@ public enum MetaInformationType {
     ExternalSchemaList(UmiTypes.ExternalSchema.getTypeName() + "List"),
     ExternalTableDetail(UmiTypes.ExternalTable.getTypeName()),
     ExternalTableList(UmiTypes.ExternalTable.getTypeName() + "List"),
-    // for mq
-    TopicDetail(UmiTypes.Topic.getTypeName()),
-    TopicList(UmiTypes.Topic.getTypeName() + "List"),
-    // for cache
-    KeyDetail(UmiTypes.Key.getTypeName()),
-    KeyList(UmiTypes.Key.getTypeName() + "List"),
-    // for kafka
+    // for mq / kafka
     TopicDetail(UmiTypes.Topic.getTypeName()),
     TopicList(UmiTypes.Topic.getTypeName() + "List"),
     ConsumerGroupDetail(UmiTypes.ConsumerGroup.getTypeName()),
     ConsumerGroupList(UmiTypes.ConsumerGroup.getTypeName() + "List"),
     EndpointDetail(UmiTypes.Endpoint.getTypeName()),
-    EndpointList(UmiTypes.Endpoint.getTypeName() + "List"),;
+    EndpointList(UmiTypes.Endpoint.getTypeName() + "List"),
+    // for cache
+    KeyDetail(UmiTypes.Key.getTypeName()),
+    KeyList(UmiTypes.Key.getTypeName() + "List"),;
 
     private final String typeName;
 

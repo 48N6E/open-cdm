@@ -746,34 +746,7 @@ export default {
         rowNumber: this.getRowNumber(index),
         text: this.formatMongoDocumentText(row)
       }));
-    }
-  },
-  watch: {
-    selectedResultProgress: {
-      handler(current, previous) {
-        if (!this.tab.running || current.receiveMode !== 'PAGINATED' || !current.resultId) {
-          return;
-        }
-        if (!previous || current.resultId !== previous.resultId) {
-          return;
-        }
-        if (current.fetchCount === undefined || previous.fetchCount === undefined || current.fetchCount <= previous.fetchCount) {
-          return;
-        }
-
-        const resultId = current.resultId;
-        this.paginatedLoading[resultId] = true;
-        if (this.paginatedLoadingTimers[resultId]) {
-          clearTimeout(this.paginatedLoadingTimers[resultId]);
-        }
-        this.paginatedLoadingTimers[resultId] = setTimeout(() => {
-          this.paginatedLoading[resultId] = false;
-          delete this.paginatedLoadingTimers[resultId];
-        }, 2000);
-      },
-      immediate: false
     },
-
     displayData() {
       const tab = this.selectedTab;
       if (!tab.transposed) {
