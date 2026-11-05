@@ -1407,12 +1407,20 @@ public class DefaultMongoParserVisitor extends AbstractLocationParseTreeVisitor<
     }
 
     private void applyFilterObj(MongoFilterSubqueryHost host, MongoParser.ObjContext filter) {
+        if (!containsSubquery(filter)) {
+            host.setFilter(filter.getText());
+            return;
+        }
         List<MongoFilterSubquery> subqueries = new ArrayList<>();
         host.setFilter(serializeObj(filter, subqueries));
         host.setFilterSubqueries(subqueries);
     }
 
     private void applyFilterJson(MongoFilterSubqueryHost host, MongoParser.JsonStringContext filter) {
+        if (!containsSubquery(filter)) {
+            host.setFilter(filter.getText());
+            return;
+        }
         List<MongoFilterSubquery> subqueries = new ArrayList<>();
         host.setFilter(serializeValue(filter.value(), subqueries));
         host.setFilterSubqueries(subqueries);
@@ -1422,7 +1430,7 @@ public class DefaultMongoParserVisitor extends AbstractLocationParseTreeVisitor<
         if (!containsSubquery(ctx)) {
             return ctx.getText();
         }
-        if (ctx.pair() == null || ctx.pair().isEmpty()) {
+        if (ctx.pair().isEmpty()) {
             return "{}";
         }
         StringBuilder sb = new StringBuilder();
@@ -1444,7 +1452,7 @@ public class DefaultMongoParserVisitor extends AbstractLocationParseTreeVisitor<
         if (!containsSubquery(ctx)) {
             return ctx.getText();
         }
-        if (ctx.value() == null || ctx.value().isEmpty()) {
+        if (ctx.value().isEmpty()) {
             return "[]";
         }
         StringBuilder sb = new StringBuilder();
