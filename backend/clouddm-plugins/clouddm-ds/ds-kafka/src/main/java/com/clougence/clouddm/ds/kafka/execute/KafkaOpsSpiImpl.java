@@ -38,7 +38,7 @@ public class KafkaOpsSpiImpl implements KafkaOpsSpi {
     @Override
     public void createTopic(Connection connection, String topicName, int partitions, short replicationFactor, Map<String, String> configs) {
         invoke(connection, "createTopic", new Class<?>[] { Connection.class, String.class, int.class, short.class, Map.class }, //
-               connection, topicName, partitions, replicationFactor, configs);
+                connection, topicName, partitions, replicationFactor, configs);
     }
 
     @Override
@@ -60,7 +60,7 @@ public class KafkaOpsSpiImpl implements KafkaOpsSpi {
     @Override
     public void alterTopicLayout(Connection connection, String topicName, int partitions, short replicationFactor) {
         invoke(connection, "alterTopicLayout", new Class<?>[] { Connection.class, String.class, int.class, short.class }, //
-               connection, topicName, partitions, replicationFactor);
+                connection, topicName, partitions, replicationFactor);
     }
 
     @Override
@@ -71,8 +71,26 @@ public class KafkaOpsSpiImpl implements KafkaOpsSpi {
     @Override
     public void resetConsumerGroupOffsets(Connection connection, String groupId, String mode, List<String> topics, Long timestampMs, Long offset) {
         invoke(connection, "resetConsumerGroupOffsets", //
-               new Class<?>[] { Connection.class, String.class, String.class, List.class, Long.class, Long.class }, //
-               connection, groupId, mode, topics, timestampMs, offset);
+                new Class<?>[] { Connection.class, String.class, String.class, List.class, Long.class, Long.class }, //
+                connection, groupId, mode, topics, timestampMs, offset);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> consumeMessages(Connection connection, String topicName, Integer partition, String mode, int maxMessages, long timeoutMs,
+                                                     String groupId) {
+        return (List<Map<String, Object>>) invoke(connection, "consumeMessages", //
+                                                   new Class<?>[] { Connection.class, String.class, Integer.class, String.class, int.class, long.class, String.class }, //
+                                                   connection, topicName, partition, mode, maxMessages, timeoutMs, groupId);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> produceMessage(Connection connection, String topicName, Integer partition, String key, String value, int count,
+                                              Map<String, String> headers) {
+        return (Map<String, Object>) invoke(connection, "produceMessage", //
+                                            new Class<?>[] { Connection.class, String.class, Integer.class, String.class, String.class, int.class, Map.class }, //
+                                            connection, topicName, partition, key, value, count, headers);
     }
 
     private static Object invoke(Connection connection, String methodName, Class<?>[] parameterTypes, Object... args) {

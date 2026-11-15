@@ -17,6 +17,7 @@ package com.clougence.clouddm.console.web.controller.kafka;
 
 import static com.clougence.clouddm.sdk.security.auth.def.SecRoleAuthLabel.DM_QUERY_CONSOLE;
 
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.web.bind.annotation.RequestBody;
@@ -30,8 +31,10 @@ import com.clougence.clouddm.console.web.constants.DmControllerUrlPrefix;
 import com.clougence.clouddm.console.web.global.jwtsession.RequestAuth;
 import com.clougence.clouddm.console.web.model.fo.kafka.KafkaAlterTopicConfigsFO;
 import com.clougence.clouddm.console.web.model.fo.kafka.KafkaAlterTopicLayoutFO;
+import com.clougence.clouddm.console.web.model.fo.kafka.KafkaConsumeMessagesFO;
 import com.clougence.clouddm.console.web.model.fo.kafka.KafkaCreateTopicFO;
 import com.clougence.clouddm.console.web.model.fo.kafka.KafkaGroupIdFO;
+import com.clougence.clouddm.console.web.model.fo.kafka.KafkaProduceMessageFO;
 import com.clougence.clouddm.console.web.model.fo.kafka.KafkaResetOffsetsFO;
 import com.clougence.clouddm.console.web.model.fo.kafka.KafkaTopicNameFO;
 import com.clougence.clouddm.console.web.service.auth.RdpUserService;
@@ -103,5 +106,23 @@ public class KafkaOpsController {
         String puid = (String) request.getAttribute(RdpUserService.PUID);
         this.kafkaOpsService.resetConsumerGroupOffsets(puid, fo.getDsId(), fo.getGroupId(), fo.getMode(), fo.getTopics(), fo.getTimestampMs(), fo.getOffset());
         return ResWebDataUtils.buildSuccess(true);
+    }
+
+    @RequestAuth(DM_QUERY_CONSOLE)
+    @RequestMapping(value = "/consumeMessages", method = RequestMethod.POST)
+    public ResWebData<List<Map<String, Object>>> consumeMessages(@Valid @RequestBody KafkaConsumeMessagesFO fo, HttpServletRequest request) {
+        String puid = (String) request.getAttribute(RdpUserService.PUID);
+        return ResWebDataUtils
+            .buildSuccess(this.kafkaOpsService.consumeMessages(puid, fo.getDsId(), fo.getTopicName(), fo.getPartition(), fo.getMode(), fo.getMaxMessages(),
+                                                              fo.getTimeoutMs(), fo.getGroupId()));
+    }
+
+    @RequestAuth(checkOpPassword = true, value = DM_QUERY_CONSOLE)
+    @RequestMapping(value = "/produceMessage", method = RequestMethod.POST)
+    public ResWebData<Map<String, Object>> produceMessage(@Valid @RequestBody KafkaProduceMessageFO fo, HttpServletRequest request) {
+        String puid = (String) request.getAttribute(RdpUserService.PUID);
+        return ResWebDataUtils
+            .buildSuccess(this.kafkaOpsService.produceMessage(puid, fo.getDsId(), fo.getTopicName(), fo.getPartition(), fo.getKey(), fo.getValue(), fo.getCount(),
+                                                              fo.getHeaders()));
     }
 }

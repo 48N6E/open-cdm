@@ -50,7 +50,7 @@ public class KafkaSupportSpi implements RdbSupportSpi {
 
     @Override
     public RdbSupportLevel supportChangeReadOnly(DataSourceConfig dsConfig) {
-        return RdbSupportLevel.No;
+        return RdbSupportLevel.Allow;
     }
 
     @Override

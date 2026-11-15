@@ -33,16 +33,26 @@ public class KafkaConnection extends AdapterConnection {
 
     private final Connection  owner;
     private final AdminClient adminClient;
+    private final Properties  clientProperties;
     private String            schema;
 
     KafkaConnection(Connection owner, AdminClient adminClient, String jdbcUrl, Properties properties, String schema){
         super(jdbcUrl, properties.getProperty(KafkaKeys.USERNAME));
         this.owner = owner;
         this.adminClient = adminClient;
+        this.clientProperties = new Properties();
+        this.clientProperties.putAll(properties);
         this.schema = StringUtils.defaultIfBlank(schema, KafkaKeys.DEFAULT_SCHEMA);
     }
 
     public AdminClient getAdminClient() { return this.adminClient; }
+
+    /** Kafka client config (bootstrap / security / timeouts) for Admin / Consumer / Producer. */
+    public Properties getClientProperties() {
+        Properties copy = new Properties();
+        copy.putAll(this.clientProperties);
+        return copy;
+    }
 
     @Override
     public String getCatalog() { return this.getSchema(); }
@@ -56,9 +66,7 @@ public class KafkaConnection extends AdapterConnection {
     public String getSchema() { return this.schema; }
 
     @Override
-    public void setSchema(String schema) {
-        this.schema = StringUtils.defaultIfBlank(schema, KafkaKeys.DEFAULT_SCHEMA);
-    }
+    public void setSchema(String schema) { this.schema = StringUtils.defaultIfBlank(schema, KafkaKeys.DEFAULT_SCHEMA); }
 
     @Override
     public AdapterRequest newRequest(String sql) {

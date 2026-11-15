@@ -63,12 +63,13 @@ public class SelConfigSpi extends AbstractDsConfigSpi {
 
     @Override
     public boolean supportSSL() {
-        return false;
+        return true;
     }
 
     @Override
     public List<SslMode> sslModeSet() {
-        return List.of(SslMode.TRUST, SslMode.CA, SslMode.CLIENT_CERT);
+        // Same modes as MySQL: SelectDB uses MySQL Connector/J keystore-based SSL.
+        return List.of(SslMode.TRUST, SslMode.TRUSTSTORE, SslMode.KEYSTORE_TRUSTSTORE);
     }
 
     @Override

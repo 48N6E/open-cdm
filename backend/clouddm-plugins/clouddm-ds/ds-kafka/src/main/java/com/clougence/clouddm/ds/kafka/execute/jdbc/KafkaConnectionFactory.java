@@ -59,7 +59,7 @@ public class KafkaConnectionFactory implements AdapterFactory {
         try {
             Properties adminProps = KafkaAdminConfigs.fromCaseMap(caseProps);
             AdminClient adminClient = AdminClient.create(adminProps);
-            return new KafkaConnection(owner, adminClient, jdbcUrl, props, caseProps.get(KafkaKeys.DATABASE));
+            return new KafkaConnection(owner, adminClient, jdbcUrl, adminProps, caseProps.get(KafkaKeys.DATABASE));
         } catch (Exception e) {
             throw new SQLException("create Kafka AdminClient failed: " + e.getMessage(), e);
         }

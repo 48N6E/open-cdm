@@ -5,5 +5,7 @@ export const kafkaApi = {
   dmKafkaAlterTopicConfigs: '/api/entry/kafka/alterTopicConfigs',
   dmKafkaAlterTopicLayout: '/api/entry/kafka/alterTopicLayout',
   dmKafkaDeleteConsumerGroup: '/api/entry/kafka/deleteConsumerGroup',
-  dmKafkaResetConsumerGroupOffsets: '/api/entry/kafka/resetConsumerGroupOffsets'
+  dmKafkaResetConsumerGroupOffsets: '/api/entry/kafka/resetConsumerGroupOffsets',
+  dmKafkaConsumeMessages: '/api/entry/kafka/consumeMessages',
+  dmKafkaProduceMessage: '/api/entry/kafka/produceMessage'
 };

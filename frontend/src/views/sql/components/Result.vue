@@ -222,12 +222,20 @@
             <div class="tip-footer-right">
               <div
                 class="tip-footer-transpose-btn"
-                :class="{ 'tip-footer-transpose-btn--active': selectedTab.transposed }"
+                :class="{ 'tip-footer-transpose-btn--active': selectedTab.transposed && mongoViewMode !== 'json' }"
                 v-if="selectedTab.receiveMode !== 'STREAM'"
                 @click="toggleTranspose"
               >
                 <CustomIcon type="icon-v2-qiehuanmoshi2" hoverStyle />
                 <span>{{ $t('sqlResult.transpose') }}</span>
+              </div>
+              <div
+                v-if="isMongoDbResult"
+                class="tip-footer-json-btn"
+                :class="{ 'tip-footer-json-btn--active': mongoViewMode === 'json' }"
+                @click="toggleMongoJsonView"
+              >
+                <span>{{ $t('mongo-query-result-to-json') }}</span>
               </div>
               <div class="tip-footer-export" v-if="!selectedTab.exportState?.exporting && selectedTab.exportState?.percent !== 100">
                 <Poptip
@@ -255,7 +263,20 @@
             </div>
           </div>
           <div class="result-table-container" v-if="selectedTab">
+            <div v-if="isMongoDbResult && mongoViewMode === 'json'" class="mongo-json-result-container" :style="{ maxHeight: `${tableScrollY}px` }">
+              <div v-if="!mongoJsonDocuments.length" class="mongo-json-empty">{{ $t('zan-wu-shu-ju') }}</div>
+              <div v-for="doc in mongoJsonDocuments" :key="`${selectedTab.resultId}-${doc.rowNumber}`" class="mongo-json-doc">
+                <div class="mongo-json-doc-header">
+                  <span>{{ $t('mongo-result-document-index', [doc.rowNumber]) }}</span>
+                  <span class="mongo-json-copy" @click="handleCopyMongoDocument(doc.text)">
+                    <cc-iconfont name="copy" :size="12" />
+                  </span>
+                </div>
+                <pre class="mongo-json-doc-body">{{ doc.text }}</pre>
+              </div>
+            </div>
             <a-table
+              v-else
               class="result-set-style"
               :class="{ 'result-set-style--empty': !selectedTab.showData?.length }"
               :ref="`result_table_${tab.result.active}`"
@@ -576,6 +597,9 @@ export default {
       columnSelectAll: true,
       rowIndex: 0,
       pageHeight: 0,
+      mongoResultViewMode: {},
+      mongoJsonHydratedDocs: [],
+      mongoJsonHydrateToken: 0,
       tableMenu: {
         body: {
           options: [
@@ -874,7 +898,28 @@ export default {
       }
       this.$nextTick(() => {
         this.initTableScrollObserver();
+        this.hydrateMongoJsonDocuments();
       });
+    },
+    mongoViewMode(mode) {
+      if (mode !== 'json') {
+        this.mongoJsonHydratedDocs = [];
+        return;
+      }
+      this.hydrateMongoJsonDocuments();
+    },
+    'selectedTab.resultId'() {
+      this.mongoJsonHydratedDocs = [];
+      if (this.mongoViewMode === 'json') {
+        this.hydrateMongoJsonDocuments();
+      }
+    },
+    'selectedTab.showData': {
+      handler() {
+        if (this.mongoViewMode === 'json') {
+          this.hydrateMongoJsonDocuments();
+        }
+      }
     }
   },
   mounted() {
@@ -1188,6 +1233,13 @@ export default {
       this.showInsertSqlModal = false;
       this.currentTableName = '';
     },
+    buildMongoDocumentFromRow(row) {
+      const doc = {};
+      this.mongoJsonColumnList.forEach((col) => {
+        doc[col] = this.normalizeMongoFieldValue(row[col]);
+      });
+      return doc;
+    },
     formatMongoDocumentText(row) {
       try {
         const cols = this.mongoJsonColumnList;
@@ -1211,7 +1263,6 @@ export default {
         return String(row);
       }
     },
-
     normalizeMongoFieldValue(value) {
       if (value === null || value === undefined) {
         return null;
@@ -1233,7 +1284,69 @@ export default {
         return value;
       }
     },
+    async hydrateMongoJsonDocuments() {
+      if (!this.isMongoDbResult || this.mongoViewMode !== 'json') {
+        return;
+      }
+      const rows = this.selectedTab?.showData || [];
+      if (!rows.length) {
+        this.mongoJsonHydratedDocs = [];
+        return;
+      }
 
+      const token = this.mongoJsonHydrateToken + 1;
+      this.mongoJsonHydrateToken = token;
+      const docs = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        let text = this.formatMongoDocumentText(row);
+        const cols = this.mongoJsonColumnList;
+        if (cols.length === 1 && cols[0] === 'RESULT') {
+          const cellMeta = this.getCellValueMeta({ dataIndex: 'RESULT' }, i);
+          if (cellMeta && !cellMeta.error && cellMeta.moreSize > 0) {
+            try {
+              text = await this.fetchFullCellText(cellMeta, typeof row.RESULT === 'string' ? row.RESULT : text);
+              const parsed = this.normalizeMongoFieldValue(text);
+              if (parsed !== null && typeof parsed === 'object') {
+                text = JSON.stringify(parsed, null, 2);
+              }
+            } catch (err) {
+              // No result-cache file (or Windows URI parse failure) — keep preview text.
+              appLogger.debug('hydrate mongo json result failed:', err);
+            }
+          }
+        } else {
+          const hydratedRow = { ...row };
+          for (let c = 0; c < cols.length; c++) {
+            const col = cols[c];
+            const cellMeta = this.getCellValueMeta({ dataIndex: col }, i);
+            if (!cellMeta || cellMeta.error || !(cellMeta.moreSize > 0)) {
+              continue;
+            }
+            try {
+              const initial = typeof row[col] === 'string' ? row[col] : '';
+              hydratedRow[col] = await this.fetchFullCellText(cellMeta, initial);
+            } catch (err) {
+              appLogger.debug('hydrate mongo json field failed:', err);
+            }
+          }
+          text = this.formatMongoDocumentText(hydratedRow);
+        }
+        docs.push({
+          rowNumber: this.getRowNumber(i),
+          text
+        });
+      }
+
+      if (token !== this.mongoJsonHydrateToken) {
+        return;
+      }
+      this.mongoJsonHydratedDocs = docs;
+    },
+    handleCopyMongoDocument(text) {
+      this.copyText(text);
+    },
     handleCustomRow(record, index) {
       const handlers = {
         onClick: (event) => {
@@ -1249,7 +1362,23 @@ export default {
       return handlers;
     },
     toggleTranspose() {
+      // Official transpose keeps table view; leave JSON if it was active.
+      if (this.mongoViewMode === 'json') {
+        this.mongoViewMode = 'table';
+        this.selectedTab.transposed = true;
+        return;
+      }
       this.selectedTab.transposed = !this.selectedTab.transposed;
+    },
+    toggleMongoJsonView() {
+      if (this.mongoViewMode === 'json') {
+        this.mongoViewMode = 'table';
+        return;
+      }
+      if (this.selectedTab?.transposed) {
+        this.selectedTab.transposed = false;
+      }
+      this.mongoViewMode = 'json';
     },
     handleRowClick(record, index, event) {
       // Handle row clicks.
@@ -2585,6 +2714,7 @@ export default {
   position: relative;
   display: flex;
   align-items: center;
+  gap: 8px;
   overflow: hidden;
   color: rgba(0, 0, 0, 0.88);
   background: #ffffff;
@@ -2677,13 +2807,8 @@ export default {
   align-items: center;
   flex-shrink: 0;
   white-space: nowrap;
-  position: absolute;
-  right: 10px;
-  top: 0;
   height: 30px;
-  z-index: 2;
-  background: #ffffff;
-  padding-left: 8px;
+  margin-left: auto;
   gap: 8px;
 
   :deep(.ant-btn) {
@@ -2725,6 +2850,66 @@ export default {
   &--active {
     color: var(--primary-color);
   }
+}
+
+.tip-footer-json-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0 4px;
+  border-radius: 6px;
+
+  &--active {
+    color: var(--primary-color);
+  }
+}
+
+.mongo-json-result-container {
+  overflow: auto;
+  padding: 8px;
+  background: #fafafa;
+}
+
+.mongo-json-empty {
+  padding: 24px;
+  text-align: center;
+  color: #999;
+}
+
+.mongo-json-doc {
+  margin-bottom: 12px;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.mongo-json-doc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #666;
+  border-bottom: 1px solid #f0f0f0;
+  background: #f5f5f5;
+}
+
+.mongo-json-copy {
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.mongo-json-doc-body {
+  margin: 0;
+  padding: 10px 12px;
+  font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .transposed-field-cell {

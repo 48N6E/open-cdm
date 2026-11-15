@@ -81,19 +81,13 @@ public class DrMetaProviderDm extends MyMetaProviderDm implements MetaDataServic
     }
 
     public List<Value> selectTables(String schema) throws SQLException {
-        String sql = "show full tables from " + DorisDialect.INSTANCE.fmtName(false, schema) + " where Table_type = 'BASE TABLE'";
-        try (Connection conn = this.connectSupplier.eGet(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            try (ResultSet rs = ps.executeQuery()) {
-                List<Value> schemas = this.providerUtils.convertTableName(rs);
-                schemas.sort(Comparator.comparing(Value::asValue));
-                return schemas.stream().filter(value -> value.getUmiType() != null).collect(Collectors.toList());
-            }
-        }
+        // Doris 3+ plans "SHOW FULL TABLES ... WHERE" as a BE scan; keep SHOW on FE and filter in Java.
+        return this.selectFullTables(schema, UmiTypes.Table);
     }
 
     @Override
     public List<Value> selectViews(String schema) throws SQLException {
-        return this.selectByConditions(schema, "where table_type like '%VIEW'");
+        return this.selectFullTables(schema, UmiTypes.View);
     }
 
     @Override
@@ -110,14 +104,13 @@ public class DrMetaProviderDm extends MyMetaProviderDm implements MetaDataServic
 
     }
 
-    private List<Value> selectByConditions(String schema, String conditions) throws SQLException {
-        String safeName = DorisDialect.INSTANCE.fmtName(false, schema);
-        String sql = String.format("show full tables from %s ", safeName) + conditions;
+    private List<Value> selectFullTables(String schema, UmiTypes leafType) throws SQLException {
+        String sql = "show full tables from " + DorisDialect.INSTANCE.fmtName(false, schema);
         try (Connection conn = this.connectSupplier.eGet(); PreparedStatement ps = conn.prepareStatement(sql)) {
             try (ResultSet rs = ps.executeQuery()) {
                 List<Value> schemas = this.providerUtils.convertTableName(rs);
                 schemas.sort(Comparator.comparing(Value::asValue));
-                return schemas.stream().filter(value -> value.getUmiType() != null).collect(Collectors.toList());
+                return schemas.stream().filter(value -> value.getUmiType() == leafType).collect(Collectors.toList());
             }
         }
     }

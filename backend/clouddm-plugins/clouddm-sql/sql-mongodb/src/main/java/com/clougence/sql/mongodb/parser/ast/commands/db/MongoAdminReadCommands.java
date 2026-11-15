@@ -29,35 +29,23 @@ import com.clougence.sql.mongodb.parser.ast.commands.AbstractMongoFunc;
  */
 public final class MongoAdminReadCommands {
 
-    private static final String ADMIN = "admin";
-    private static final String LOCAL = "local";
+    private static final String                         ADMIN       = "admin";
+    private static final String                         LOCAL       = "local";
 
     private static final Map<String, AbstractMongoFunc> RS_COMMANDS = new HashMap<>();
     private static final Map<String, AbstractMongoFunc> SH_COMMANDS = new HashMap<>();
 
     // Completion labels keep shell camelCase; resolve* still accepts any case.
-    private static final List<String> RS_METHODS = List.of(
-        "status",
-        "printSecondaryReplicationInfo",
-        "printSlaveReplicationInfo",
-        "conf",
-        "config",
-        "printReplicationInfo",
-        "getReplicationInfo",
-        "hello",
-        "isMaster"
-    );
-    private static final List<String> SH_METHODS = List.of(
-        "status",
-        "printShardingStatus",
-        "isBalancerRunning",
-        "getBalancerState",
-        "balancerStatus"
-    );
+    private static final List<String>                   RS_METHODS  = List
+        .of("status", "printSecondaryReplicationInfo", "printSlaveReplicationInfo", "conf", "config", "printReplicationInfo", "getReplicationInfo", "hello", "isMaster");
+    private static final List<String>                   SH_METHODS  = List.of("status", "printShardingStatus", "isBalancerRunning", "getBalancerState", "balancerStatus");
 
     static {
         MongoReadCommandFunc rsStatus = read(MongoFuncType.RS_STATUS, "{\"replSetGetStatus\":1}", ADMIN);
-        alias(RS_COMMANDS, rsStatus, "status", "printSecondaryReplicationInfo", "printSlaveReplicationInfo");
+        alias(RS_COMMANDS, rsStatus, "status");
+
+        MongoReadCommandFunc rsPrintSecondary = read(MongoFuncType.RS_PRINT_SECONDARY_REPLICATION_INFO, "{\"replSetGetStatus\":1}", ADMIN);
+        alias(RS_COMMANDS, rsPrintSecondary, "printSecondaryReplicationInfo", "printSlaveReplicationInfo");
 
         MongoReadCommandFunc rsConf = read(MongoFuncType.RS_CONF, "{\"replSetGetConfig\":1}", ADMIN);
         alias(RS_COMMANDS, rsConf, "conf", "config");

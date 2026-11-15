@@ -5,6 +5,11 @@
         <Button size="small" :loading="refreshing" @click="handleRefresh">
           {{ $t('kafka-console-refresh') }}
         </Button>
+        <Button v-if="isSupportReadOnly" size="small" class="kafka-console__readonly-btn" :disabled="tab.consoleQueryOnly" @click="toggleReadOnly">
+          <Checkbox :model-value="!!tab.readOnly" :disabled="tab.consoleQueryOnly">
+            {{ $t('zhi-du') }}
+          </Checkbox>
+        </Button>
         <template v-if="canModify && isTopic">
           <Button size="small" type="primary" @click="openCreateTopic">
             {{ $t('kafka-console-create-topic') }}
@@ -14,6 +19,12 @@
           </Button>
           <Button v-if="selectedNode" size="small" @click="openAlterConfigs">
             {{ $t('kafka-console-alter-configs') }}
+          </Button>
+          <Button v-if="selectedNode" size="small" @click="openConsume">
+            {{ $t('kafka-console-consume') }}
+          </Button>
+          <Button v-if="selectedNode" size="small" @click="openProduce">
+            {{ $t('kafka-console-produce') }}
           </Button>
           <Button v-if="selectedNode" size="small" type="error" ghost @click="confirmDeleteTopic">
             {{ $t('kafka-console-delete-topic') }}
@@ -71,6 +82,19 @@
           {{ $t('kafka-console-partitions') }}
         </div>
         <Table :columns="partitionColumns" :data="partitionRows" size="small" border stripe />
+
+        <div class="kafka-console__section-title kafka-console__section-title--sub kafka-console__messages-header">
+          <span>{{ $t('kafka-console-consume-result') }}</span>
+          <div class="kafka-console__messages-actions">
+            <Button size="small" :disabled="!consumeRows.length" @click="copyConsumeRows">{{ $t('kafka-console-consume-copy-json') }}</Button>
+            <Button size="small" :disabled="!consumeRows.length" @click="downloadConsumeRows">{{ $t('kafka-console-consume-download-json') }}</Button>
+            <Button size="small" :disabled="!consumeRows.length" @click="clearConsumeRows">{{ $t('kafka-console-consume-clear') }}</Button>
+          </div>
+        </div>
+        <div v-if="!consumeRows.length" class="kafka-console__messages-empty">
+          {{ $t('kafka-console-consume-empty') }}
+        </div>
+        <Table v-else :columns="consumeColumns" :data="consumeRows" size="small" border stripe max-height="420" />
       </template>
 
       <template v-else-if="isConsumerGroup">
@@ -157,14 +181,70 @@
         </FormItem>
       </Form>
     </Modal>
+
+    <Modal v-model="consumeVisible" :title="$t('kafka-console-consume')" width="720" :footer-hide="true">
+      <Alert type="info" show-icon style="margin-bottom: 12px">
+        {{ $t('kafka-console-consume-hint') }}
+      </Alert>
+      <Form :label-width="120">
+        <FormItem :label="$t('kafka-console-consume-mode')">
+          <Select v-model="consumeForm.mode" style="width: 100%">
+            <Option value="RECENT">{{ $t('kafka-console-mode-recent') }}</Option>
+            <Option value="EARLIEST">{{ $t('kafka-console-mode-earliest') }}</Option>
+            <Option value="LATEST">{{ $t('kafka-console-mode-latest') }}</Option>
+            <Option value="GROUP">{{ $t('kafka-console-mode-group') }}</Option>
+          </Select>
+        </FormItem>
+        <FormItem :label="$t('kafka-console-consumer-group')">
+          <Input v-model="consumeForm.groupId" :placeholder="$t('kafka-console-consumer-group-placeholder')" />
+          <div class="kafka-console__config-hint">{{ $t('kafka-console-consumer-group-hint') }}</div>
+        </FormItem>
+        <FormItem :label="$t('kafka-console-partition-id')">
+          <InputNumber v-model="consumeForm.partition" :min="0" :placeholder="$t('kafka-console-partition-optional')" style="width: 100%" />
+        </FormItem>
+        <FormItem :label="$t('kafka-console-consume-count')">
+          <InputNumber v-model="consumeForm.maxMessages" :min="1" :max="500" style="width: 100%" />
+        </FormItem>
+        <FormItem :label="$t('kafka-console-timeout-ms')">
+          <InputNumber v-model="consumeForm.timeoutMs" :min="1000" :max="60000" :step="1000" style="width: 100%" />
+        </FormItem>
+      </Form>
+      <div class="kafka-console__modal-footer">
+        <Button @click="consumeVisible = false">{{ $t('guan-bi') }}</Button>
+        <Button type="primary" :loading="consuming" @click="submitConsume">{{ $t('kafka-console-consume-run') }}</Button>
+      </div>
+    </Modal>
+
+    <Modal v-model="produceVisible" :title="$t('kafka-console-produce')" :loading="submitting" width="640" @on-ok="submitProduce">
+      <Form :label-width="120">
+        <FormItem :label="$t('kafka-console-produce-count')">
+          <InputNumber v-model="produceForm.count" :min="1" :max="500" style="width: 100%" />
+        </FormItem>
+        <FormItem :label="$t('kafka-console-partition-id')">
+          <InputNumber v-model="produceForm.partition" :min="0" :placeholder="$t('kafka-console-partition-optional')" style="width: 100%" />
+        </FormItem>
+        <FormItem :label="$t('kafka-console-message-key')">
+          <Input v-model="produceForm.key" />
+        </FormItem>
+        <FormItem :label="$t('kafka-console-message-value')">
+          <Input v-model="produceForm.value" type="textarea" :rows="8" />
+        </FormItem>
+        <FormItem :label="$t('kafka-console-message-headers')">
+          <div class="kafka-console__config-hint">{{ $t('kafka-console-message-headers-hint') }}</div>
+          <Input v-model="produceForm.headersText" type="textarea" :rows="4" :placeholder="$t('kafka-console-message-headers-placeholder')" />
+        </FormItem>
+      </Form>
+    </Modal>
   </div>
 </template>
 
 <script>
+import copyMixin from '@/mixins/copyMixin';
 import { KAFKA_ATTR, KAFKA_JSON, KAFKA_LEAF, attrOf, parseJsonArray } from './attrKeys';
 
 export default {
   name: 'KafkaConsole',
+  mixins: [copyMixin],
   props: {
     tab: {
       type: Object,
@@ -183,6 +263,9 @@ export default {
       alterLayoutVisible: false,
       alterConfigsVisible: false,
       resetOffsetsVisible: false,
+      consumeVisible: false,
+      produceVisible: false,
+      consuming: false,
       createTopicForm: {
         topicName: '',
         partitions: 1,
@@ -199,12 +282,30 @@ export default {
         timestamp: new Date(),
         offset: 0,
         topics: []
+      },
+      consumeForm: {
+        mode: 'RECENT',
+        groupId: '',
+        partition: null,
+        maxMessages: 50,
+        timeoutMs: 5000
+      },
+      consumeRows: [],
+      produceForm: {
+        count: 1,
+        partition: null,
+        key: '',
+        value: '',
+        headersText: ''
       }
     };
   },
   computed: {
     canModify() {
       return !this.tab?.readOnly && !this.tab?.consoleQueryOnly;
+    },
+    isSupportReadOnly() {
+      return this.tab?.support?.readOnly?.conf !== 'No';
     },
     leafType() {
       return this.tab?.leafType || '';
@@ -298,9 +399,25 @@ export default {
       const fromGroup = this.consumedTopicRows.map((row) => row[KAFKA_JSON.TOPIC_NAME]).filter(Boolean);
       const selected = this.resetForm.topics || [];
       return Array.from(new Set([...fromGroup, ...selected]));
+    },
+    consumeColumns() {
+      return [
+        { title: this.$t('kafka-console-partition-id'), key: 'partition', width: 90 },
+        { title: this.$t('kafka-console-absolute-offset'), key: 'offset', width: 100 },
+        { title: this.$t('kafka-console-log-time'), key: 'timestamp', width: 160 },
+        { title: this.$t('kafka-console-message-key'), key: 'key', minWidth: 100, tooltip: true },
+        { title: this.$t('kafka-console-message-headers'), key: 'headersText', minWidth: 160, tooltip: true },
+        { title: this.$t('kafka-console-message-value'), key: 'value', minWidth: 200, tooltip: true }
+      ];
     }
   },
   methods: {
+    toggleReadOnly() {
+      if (this.tab.consoleQueryOnly) {
+        return;
+      }
+      this.tab.readOnly = !this.tab.readOnly;
+    },
     async handleRefresh() {
       this.refreshing = true;
       try {
@@ -527,6 +644,160 @@ export default {
       } finally {
         this.submitting = false;
       }
+    },
+    openConsume() {
+      this.consumeForm = {
+        mode: 'RECENT',
+        groupId: '',
+        partition: null,
+        maxMessages: 50,
+        timeoutMs: 5000
+      };
+      this.consumeVisible = true;
+    },
+    async submitConsume() {
+      const topicName = this.selectedNode?.title || this.selectedNode?.objName;
+      const groupId = (this.consumeForm.groupId || '').trim();
+      if (this.consumeForm.mode === 'GROUP' && !groupId) {
+        this.$Message.warning(this.$t('kafka-console-consumer-group-required'));
+        return;
+      }
+      this.consuming = true;
+      try {
+        const res = await this.$services.dmKafkaConsumeMessages({
+          data: {
+            dsId: this.tab.dsId,
+            topicName,
+            partition: this.consumeForm.partition,
+            mode: this.consumeForm.mode,
+            maxMessages: this.consumeForm.maxMessages,
+            timeoutMs: this.consumeForm.timeoutMs,
+            groupId: groupId || null
+          }
+        });
+        if (!res.success) {
+          return;
+        }
+        this.consumeRows = (res.data || []).map((row) => ({
+          ...row,
+          headersText: this.formatHeaders(row.headers)
+        }));
+        this.consumeVisible = false;
+        this.$Message.success(this.$t('kafka-console-consume-done', { count: this.consumeRows.length }));
+      } finally {
+        this.consuming = false;
+      }
+    },
+    formatHeaders(headers) {
+      if (!headers || typeof headers !== 'object') {
+        return '';
+      }
+      return Object.keys(headers)
+        .map((key) => `${key}=${headers[key] == null ? '' : headers[key]}`)
+        .join(',');
+    },
+    parseHeadersText(text) {
+      const headers = {};
+      (text || '')
+        .split(/[,\n]/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .forEach((item) => {
+          const idx = item.indexOf('=');
+          if (idx <= 0) {
+            return;
+          }
+          const key = item.slice(0, idx).trim();
+          const value = item.slice(idx + 1).trim();
+          if (key) {
+            headers[key] = value;
+          }
+        });
+      return headers;
+    },
+    consumeRowsAsJson() {
+      return JSON.stringify(
+        (this.consumeRows || []).map((row) => {
+          const copy = { ...row };
+          delete copy.headersText;
+          return copy;
+        }),
+        null,
+        2
+      );
+    },
+    async copyConsumeRows() {
+      if (!this.consumeRows.length) {
+        this.$Message.warning(this.$t('kafka-console-consume-empty'));
+        return;
+      }
+      await this.copyText(this.consumeRowsAsJson());
+    },
+    downloadConsumeRows() {
+      if (!this.consumeRows.length) {
+        this.$Message.warning(this.$t('kafka-console-consume-empty'));
+        return;
+      }
+      const topicName = this.selectedNode?.title || this.selectedNode?.objName || 'topic';
+      const blob = new Blob([this.consumeRowsAsJson()], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `kafka-${topicName}-${Date.now()}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      this.$Message.success(this.$t('kafka-console-consume-download-done'));
+    },
+    clearConsumeRows() {
+      this.consumeRows = [];
+    },
+    openProduce() {
+      this.produceForm = {
+        count: 1,
+        partition: null,
+        key: '',
+        value: '',
+        headersText: ''
+      };
+      this.produceVisible = true;
+    },
+    async submitProduce() {
+      const topicName = this.selectedNode?.title || this.selectedNode?.objName;
+      if (this.produceForm.value === null || this.produceForm.value === undefined) {
+        this.$Message.warning(this.$t('kafka-console-message-value-required'));
+        return false;
+      }
+      const headers = this.parseHeadersText(this.produceForm.headersText);
+      this.submitting = true;
+      try {
+        const res = await this.$services.dmKafkaProduceMessage({
+          data: {
+            dsId: this.tab.dsId,
+            topicName,
+            partition: this.produceForm.partition,
+            key: this.produceForm.key || null,
+            value: this.produceForm.value,
+            count: this.produceForm.count || 1,
+            headers: Object.keys(headers).length ? headers : null
+          }
+        });
+        if (!res.success) {
+          return false;
+        }
+        const meta = res.data || {};
+        this.$Message.success(
+          this.$t('kafka-console-produce-done', {
+            count: meta.count || this.produceForm.count || 1,
+            partition: meta.partition,
+            offset: meta.offset
+          })
+        );
+        this.produceVisible = false;
+      } finally {
+        this.submitting = false;
+      }
     }
   }
 };
@@ -555,6 +826,12 @@ export default {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.kafka-console__readonly-btn {
+  :deep(.ivu-checkbox-wrapper) {
+    margin-right: 0;
+  }
 }
 
 .kafka-console__toolbar-right {
@@ -640,5 +917,31 @@ export default {
 .kafka-console__config-hint {
   margin-bottom: 12px;
   color: #888;
+}
+
+.kafka-console__messages-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kafka-console__messages-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.kafka-console__messages-empty {
+  color: #888;
+  padding: 12px 0;
+}
+
+.kafka-console__modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
 }
 </style>

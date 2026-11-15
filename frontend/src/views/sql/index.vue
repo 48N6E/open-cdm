@@ -1981,10 +1981,14 @@ export default {
             targetTab.connected = true;
           }
 
+          targetTab.consoleQueryOnly = !!res.data.consoleQueryOnly;
           if (!restore && !targetTab.sessionId) {
             targetTab.isolation = res.data.isolation.defaultValue;
             targetTab.autoCommit = res.data.autoCommit.defaultValue === 'true';
             targetTab.readOnly = res.data.readOnly.defaultValue === 'true';
+          }
+          if (targetTab.consoleQueryOnly) {
+            targetTab.readOnly = true;
           }
 
           if (targetTab.sessionId && targetTab.connected) {

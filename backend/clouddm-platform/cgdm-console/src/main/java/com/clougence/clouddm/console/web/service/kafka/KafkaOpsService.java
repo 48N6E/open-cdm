@@ -53,11 +53,11 @@ public class KafkaOpsService {
     private static final Pattern KAFKA_OPS_I18N_KEY = Pattern.compile("(CONSOLE_KAFKA_OPS_[A-Z0-9_]+)");
 
     @Resource
-    private ObjectCacheDao    objectCacheDao;
+    private ObjectCacheDao       objectCacheDao;
     @Resource
-    private DmDsConfigService dmDsConfigService;
+    private DmDsConfigService    dmDsConfigService;
     @Resource
-    private DmEnvParamService dmEnvParamService;
+    private DmEnvParamService    dmEnvParamService;
 
     public void createTopic(String puid, Long dsId, String topicName, int partitions, short replicationFactor, Map<String, String> configs) {
         withConnection(puid, dsId, true, (ops, connection) -> {
@@ -103,6 +103,18 @@ public class KafkaOpsService {
             ops.resetConsumerGroupOffsets(connection, groupId, mode, topics, timestampMs, offset);
             return null;
         });
+    }
+
+    public List<Map<String, Object>> consumeMessages(String puid, Long dsId, String topicName, Integer partition, String mode, int maxMessages, long timeoutMs,
+                                                     String groupId) {
+        boolean commitGroup = StringUtils.isNotBlank(groupId);
+        return withConnection(puid, dsId, commitGroup,
+                              (ops, connection) -> ops.consumeMessages(connection, topicName, partition, mode, maxMessages, timeoutMs, groupId));
+    }
+
+    public Map<String, Object> produceMessage(String puid, Long dsId, String topicName, Integer partition, String key, String value, int count,
+                                              Map<String, String> headers) {
+        return withConnection(puid, dsId, true, (ops, connection) -> ops.produceMessage(connection, topicName, partition, key, value, count, headers));
     }
 
     private <T> T withConnection(String puid, Long dsId, boolean writable, BiFunction<KafkaOpsSpi, Connection, T> action) {

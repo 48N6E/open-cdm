@@ -50,4 +50,19 @@ public interface KafkaOpsSpi extends Spi {
      * @param offset used when mode=OFFSET (same absolute offset for every partition)
      */
     void resetConsumerGroupOffsets(Connection connection, String groupId, String mode, List<String> topics, Long timestampMs, Long offset);
+
+    /**
+     * Preview / consume messages.
+     *
+     * @param mode EARLIEST / LATEST / RECENT / GROUP
+     * @param partition null means all partitions
+     * @param groupId optional; when set, offsets are committed after consume. GROUP mode requires groupId and starts from committed offsets.
+     */
+    List<Map<String, Object>> consumeMessages(Connection connection, String topicName, Integer partition, String mode, int maxMessages, long timeoutMs,
+                                              String groupId);
+
+    /**
+     * Produce one or more messages with the same key/value/headers; returns count and last record metadata.
+     */
+    Map<String, Object> produceMessage(Connection connection, String topicName, Integer partition, String key, String value, int count, Map<String, String> headers);
 }

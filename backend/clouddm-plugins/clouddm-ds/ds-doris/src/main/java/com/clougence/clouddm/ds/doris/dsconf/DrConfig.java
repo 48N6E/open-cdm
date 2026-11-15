@@ -22,6 +22,7 @@ import com.clougence.clouddm.base.metadata.ds.DataSourceConfig;
 import com.clougence.clouddm.base.metadata.ds.DataSourceType;
 import com.clougence.clouddm.base.metadata.ds.DsConfigGroup;
 import com.clougence.clouddm.ds.doris.i18n.DrConfigI18nKeys;
+import com.clougence.clouddm.dsfamily.mysql.execute.dsfactory.MySqlJdbcSslProperties;
 import com.clougence.clouddm.sdk.execute.dsconf.Serialization;
 import com.clougence.clouddm.sdk.execute.dsconf.capability.ClientTimeZoneExtProperties;
 import com.clougence.drivers.DsConfigKeys;
@@ -74,6 +75,7 @@ public class DrConfig extends DataSourceConfig implements//
         properties.setProperty(DsConfigKeys.SO_TIMEOUT_SEC.getConfigKey(), safeStr(StringUtils.toString(this.getSoTimeoutSec())));
         properties.setProperty(DsConfigKeys.CLIENT_TIME_ZONE.getConfigKey(), safeStr(this.getClientTimeZone()));
         properties.setProperty(DsConfigKeys.CLIENT_ENCODING.getConfigKey(), safeStr(this.getConnectionCharset()));
+        MySqlJdbcSslProperties.apply(properties, this);
         properties.setProperty("useCursorFetch", "false");
         return properties;
     }
